@@ -1,0 +1,143 @@
+{
+  "theme": "Dark Mode (Swiss High-Contrast / Brutalist Terminal)",
+  "typography": {
+    "fonts": {
+      "headings": "Cabinet Grotesk",
+      "body": "Inter",
+      "typing_core": "JetBrains Mono"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl tracking-tighter font-black",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "body": "text-base leading-relaxed text-neutral-400",
+      "typing_text": "text-2xl sm:text-3xl md:text-4xl leading-relaxed tracking-wide font-medium"
+    },
+    "pairing_archetype": "The 'Swiss Brutalist' (Tech / Art) combined with Terminal aesthetic for the typing experience."
+  },
+  "colors": {
+    "archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST with a Dark Obsidian base.",
+    "background": {
+      "primary": "#0A0A0A",
+      "secondary": "#171717",
+      "surface": "#262626"
+    },
+    "text": {
+      "primary": "#F5F5F5",
+      "secondary": "#A3A3A3",
+      "muted": "#525252"
+    },
+    "typing_engine": {
+      "untyped": "#525252",
+      "correct": "#E5E5E5",
+      "error": "#F43F5E",
+      "caret": "#EAB308"
+    },
+    "brand_accent": {
+      "primary": "#EAB308",
+      "hover": "#FACC15",
+      "forbidden_colors": ["#7351B7", "#1B93A4"]
+    }
+  },
+  "layouts": {
+    "container": "Max width 7xl (1280px) w/ mx-auto and p-6 sm:p-12.",
+    "dashboard_grid": "Bento Grid: grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6. Prioritize single-metric overview cards.",
+    "typing_layout": "Absolute center of screen. Single focus layout. Top navigation fades out on typing.",
+    "spacing": "Generous spacing. Use p-8 or p-12 for dashboard cards. Massive margin around the typing box."
+  },
+  "components": {
+    "notion_style_login": {
+      "description": "Minimalist centered card landing directly on Typing Practice. White background with very subtle borders on dark mode, or pure dark card with 1px border-white/10.",
+      "styles": "max-w-md mx-auto p-8 rounded-xl border border-white/10 bg-[#171717]/50 backdrop-blur-xl shadow-2xl"
+    },
+    "type_over_box": {
+      "description": "The Hero Interaction. Exact monkeytype feel. Live char-by-char diff. Must use JetBrains Mono.",
+      "styles": "relative max-w-4xl mx-auto flex flex-wrap gap-x-0 gap-y-4 text-left select-none text-3xl font-mono text-[#525252]"
+    },
+    "bento_dashboard": {
+      "description": "Progressive disclosure entry point to all modes. High level metrics (XP, streak, credits) take priority.",
+      "styles": "rounded-2xl border border-white/10 bg-[#171717] p-6 hover:-translate-y-1 transition-transform"
+    },
+    "ask_ai_block": {
+      "description": "AI responses don't appear as chat. They appear as greyed-out monospace text blocks ready to be typed over.",
+      "styles": "border-l-4 border-yellow-500 pl-6 mt-8"
+    },
+    "learn_from_scratch": {
+      "description": "AI course outline: modules -> lessons -> type-over blocks."
+    },
+    "word_of_the_day": {
+      "description": "Displays word -> meaning -> 3 example type-over sentences -> user writes their own."
+    },
+    "test_yourself": {
+      "description": "MCQ and short answer quiz format. Clean Shadcn elements."
+    },
+    "profile_and_leaderboard": {
+      "description": "Displays XP, badges, streak, learning level, per-subject progress, and rankings in a dense, high-density grid."
+    },
+    "subscription_page": {
+      "description": "Free vs Pro plan comparison, credit balance, AI usage % remaining. Premium luxury aesthetic for Pro tier."
+    }
+  },
+  "visual_enhancers": {
+    "surfaces": "Glassmorphism for floating Nav/Header (`backdrop-blur-xl bg-[#0A0A0A]/60`). Neumorphism avoided. Borders: 1px technical lines (`border-white/10`).",
+    "noise": "Subtle SVG noise overlay across the main background (opacity 2-3%) to prevent the #0A0A0A from feeling flat.",
+    "caret": "Custom block or line caret that blinks at 1s intervals. When moving, apply a 100ms smooth transform to x/y coordinates."
+  },
+  "motion": {
+    "typing": "Caret smoothly glides between characters instead of instantaneous jumping.",
+    "ui": "Staggered fade-in (100ms delay increments) for dashboard elements when loaded.",
+    "focus_mode": "When the user starts typing, the Header, Footer, and side UI elements smoothly fade to opacity-0 to create a distraction-free zone."
+  },
+  "accessibility": {
+    "contrast": "Text over backgrounds meets APCA standards. Untyped text is #525252 on #0A0A0A (low contrast by design for typing apps, but correct text must be high contrast).",
+    "reduced_motion": "Respect `prefers-reduced-motion` by disabling caret gliding and UI fade-ins.",
+    "focus": "High contrast yellow (`focus:ring-2 focus:ring-yellow-500`) for all tabbable interactive elements."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1638864616275-9f0b291a2eb6",
+        "description": "Black background texture",
+        "category": "App Background Texture / Loading Screen"
+      },
+      {
+        "url": "https://images.pexels.com/photos/28428586/pexels-photo-28428586.jpeg",
+        "description": "Monochrome 3D geometric shape with textured cubes",
+        "category": "Hero / Login Card Background Accent"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1520092352425-9699926a9b0b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwzfHxjeWJlcnB1bmslMjBrZXlib2FyZCUyMHR5cGluZ3xlbnwwfHx8fDE3ODY1NTMwODV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Mechanical keyboard",
+        "category": "Gamification Badges / Subscription Page Header"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: The entire application must be heavily keyboard-navigable. In the typing sections, auto-focus the hidden input or capture global keystrokes so the user never has to click to start.",
+    "The Type-Over Engine should render text as individual `<span>` elements per character. Use classes `text-[#525252]` for untyped, `text-[#E5E5E5]` for correct, and `text-[#F43F5E]` for errors. The background must not have generic colored outlines.",
+    "Implement 'Zen Mode': As soon as a user types the first key, add a class to the outer wrapper that fades out the navigation, footer, and stats until they finish or pause for 2 seconds.",
+    "DO NOT use a traditional chat interface for 'Ask AI'. The answer must stream in as a type-over block that the user can immediately practice on.",
+    "Use `@phosphor-icons/react` for a technical, crisp aesthetic in the Dashboard. Provide installation command: yarn add @phosphor-icons/react",
+    "Never use `transparent` backgrounds for headers with scrolling content beneath. Use `bg-[#0A0A0A]/80 backdrop-blur-md border-b border-white/10`.",
+    "CRITICAL REQUIREMENT: The project is using .js and .jsx files, NOT .tsx. All your code guidelines, generated components, and imports MUST use standard JavaScript/JSX, not TypeScript.",
+    "All interactive and key informational elements MUST include a `data-testid` attribute using kebab-case role-based formatting (e.g., `data-testid=\"login-form-submit-button\"`)."
+  ],
+  "universal_guidelines_for_main_agent": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: `transition: all`. Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add `.App { text-align: center; }` in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Create new components that match the style and conventions of existing components when needed.",
+    "Use `sonner` for toasts. Sonner component are located in `/app/src/components/ui/sonner.jsx`."
+  ]
+}

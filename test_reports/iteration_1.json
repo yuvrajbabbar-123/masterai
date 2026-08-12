@@ -1,0 +1,41 @@
+{
+  "summary": "Ran 19 pytest backend tests (all passing) covering auth, typing, all AI endpoints (ask, quiz, word-of-day, course, grade-short, grade-sentence), attempts/profile/level, credits, leaderboard. Ran Playwright end-to-end for login, typing-practice (type-over engine works, WPM/accuracy live, result card, restart, words/quote toggle, new text), dashboard, leaderboard tabs, subscription upgrade button, ask AI (returned as type-over engine), quiz (MCQ + short answer grading), word-of-day (word/meaning + 3 examples flow + user sentence grading), profile, logout, and auth gating. Learn-from-scratch course generation returned 402 for demo user (Free plan course limit=3/month already consumed). Level-Intermediate button is rendered disabled instead of clickable-with-upgrade-toast (spec deviation).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Profile / LearningLevel", "issue": "Locked levels (Intermediate/Advanced/Master) render the button with `disabled` attribute for Free users; spec says clicking a locked level should show an upgrade error toast. Currently no click event fires (button is unclickable), so no toast is shown. Remove the disabled attribute (or wrap it) so the click handler can trigger the 402 error toast.", "selector": "[data-testid=\"level-Intermediate\"]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Learn from Scratch", "issue": "POST /api/ai/course returned 402 for demo@masterai.com (Free monthly limit=3 courses already consumed for this month). Course view flow could not be verified end-to-end with demo user. Consider seeding a fresh test user, or increasing FREE course limit for demo, or resetting monthly usage in test data so the flow is testable. Backend logic itself works — 402 correctly raised; the frontend also surfaced the error in console. Just note the demo account cannot exercise the learn/course happy path anymore this month.", "affected_selectors": ["[data-testid=\"generate-course-button\"]"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Profile.jsx: allow clicking locked Learning Level buttons on Free plan so PUT /api/profile/level returns 402 and an 'Upgrade to Pro' toast is displayed (currently the button is `disabled`, blocking the toast).",
+    "Optional: reset demo user's monthly `course` usage so the Learn-from-Scratch happy path is testable (currently 402 on demo@masterai.com)."
+  ],
+  "critical_code_review_comments": [
+    "server.py get_usage() may race under concurrent requests (find_one -> insert_one). Consider upsert with $setOnInsert to make it atomic.",
+    "check_and_consume increments only after the AI call is scheduled but before it succeeds; if AI errors, the usage counter is still incremented (partial-credit refund is not applied). Consider rolling back on AI failure.",
+    "public_user is fine but plan defaulting is scattered (current.get('plan','Free') in multiple places) — centralize plan resolution in User model default.",
+    "TypeOverEngine listens on window keydown globally, which will also capture keystrokes when other inputs (e.g. Textarea on /word) are focused. WordOfDay.jsx renders Textarea AND the engine on same tree only across phases so it's fine today, but any future coexistence will double-fire. Consider scoping the listener to a focused container.",
+    "Course endpoint stores full course document; not paginated; not returning modules-count sanity. Frontend expects `modules[].lessons[].blocks[]`. Backend contract should be a Pydantic response model instead of `**data` spread."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "~92% (all major flows OK; 1 spec deviation on locked-level toast; learn-from-scratch blocked by 402 usage limit on demo user)"},
+  "test_credentials": "demo@masterai.com / demo1234 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created transient TEST_<uuid>@masterai.com registration accounts and a typing_practice attempt for demo user during tests.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite at /app/backend/tests/backend_test.py runs in ~30s and covers all API surface. Frontend TypeOverEngine listens on window keydown; type via page.keyboard.type() after reading `document.querySelector('[data-testid=\"type-over-engine\"] div.relative').innerText`. Demo user Free plan course/ask/quiz limits may deplete over repeated runs — course was already exhausted (3/3). If retesting Learn/Course flow, register a fresh TEST_ user or reset usage collection in Mongo. Level-Intermediate button is `disabled` (needs UI fix for locked-level toast).",
+  "rca of the issue": "Locked Learning Level UX: Profile.jsx sets `disabled` on locked level buttons for Free plan, which prevents onClick from firing. Spec wants a click to trigger PUT /api/profile/level (which correctly returns 402) and surface a toast. Fix: remove `disabled` and instead conditionally render clickable + on 402 catch show `toast.error('Upgrade to Pro to unlock ...')`."
+}
