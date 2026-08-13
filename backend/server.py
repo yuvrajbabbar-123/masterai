@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -19,6 +19,7 @@ from models import (
 from auth import hash_password, verify_password, create_jwt, make_authenticator
 import ai_service
 import typing_texts
+import document_service
 
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
@@ -182,6 +183,54 @@ async def get_course(course_id: str, current=Depends(get_current_user)):
     doc = await db.courses.find_one({"course_id": course_id, "user_id": current["user_id"]}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Course not found")
+    return doc
+
+
+# ================= LEARN FROM DOCUMENTS =================
+@api_router.post("/documents/upload")
+async def upload_document(file: UploadFile = File(...), current=Depends(get_current_user)):
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max 10 MB.")
+    try:
+        text = document_service.extract_text(file.filename, content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not read this file. Try a different PDF/DOCX/TXT.")
+    if len(text) < 40:
+        raise HTTPException(status_code=400, detail="Not enough readable text found in this document.")
+
+    # only consume a credit once we know we can process the file
+    await check_and_consume(current, "document")
+    level = current.get("learning_level", "Beginner")
+    try:
+        data = await ai_service.chunk_document(text, level, file.filename)
+    except Exception as e:
+        logger.exception("doc chunk failed")
+        raise HTTPException(status_code=500, detail=f"AI processing failed: {e}")
+
+    doc = {
+        "document_id": new_id("doc"), "user_id": current["user_id"],
+        "filename": file.filename, "level": level, "created_at": now_utc().isoformat(),
+        **data,
+    }
+    await db.documents.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/documents")
+async def list_documents(current=Depends(get_current_user)):
+    docs = await db.documents.find({"user_id": current["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return docs
+
+
+@api_router.get("/documents/{document_id}")
+async def get_document(document_id: str, current=Depends(get_current_user)):
+    doc = await db.documents.find_one({"document_id": document_id, "user_id": current["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
 

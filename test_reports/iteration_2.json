@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend-only e2e verification of the new 'Learn from Documents' feature for demo@masterai.com. All 5 requested scenarios PASS: (1) sidebar nav item [nav-learn-from-documents] navigates to /app/documents and dashboard mode-card [mode-card-learn-from-documents] (rendered at /app, not /app/dashboard) also navigates correctly; (2) uploading a real .docx (~37 KB, 4 paragraphs on photosynthesis) via [file-input] shows the 'Reading & building lessons…' spinner, backend returns a document_id in ~10-12s, app auto-navigates to /app/documents/<doc_id>, and [lesson-runner]+[type-over-engine] render; (3) typing the passage produces live WPM/accuracy, [result-card] appears on completion, and the 'next passage →' [restart-button] advances to the next passage; (4) returning to /app/documents lists the uploaded doc as [document-<id>] with lesson count, and clicking it re-opens DocumentView with the lesson-runner; (5) uploading an unsupported .png returns a 400 and a sonner toast reading 'Unsupported file type. Please upload a PDF, DOCX, TXT or MD file.' and the URL stays on /app/documents. No frontend bugs found for this feature. Note: Before testing I reset db.usage.document to 0 for the demo user so the free-plan 2/month document limit wouldn't block uploads.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "LearnDocuments.jsx `upload()` swallows non-response errors: `err.response?.data?.detail || 'Upload failed'` — network errors show generic 'Upload failed'. Acceptable.",
+    "LearnDocuments.jsx file input `accept` attr allows .pdf,.docx,.txt,.md but there is NO client-side validation before POST — unsupported files still hit the backend which returns 400. This works correctly (backend rejects, toast shown), but a client-side extension guard would save a round trip.",
+    "Free-plan document limit is only 2/month; testing repeatedly requires resetting db.usage.document. Consider a higher limit for the seeded demo user, or exposing a dev-only reset endpoint.",
+    "DocumentView.jsx silently redirects to /app/documents on any GET failure — a transient 5xx would look like 'document disappeared'. Consider showing an error toast before redirecting.",
+    "Dashboard mode-card route is /app (index), not /app/dashboard. The `*` catch-all in App.js redirects /app/dashboard to /app/typing, which can confuse users who type /app/dashboard directly. Consider adding an explicit /app/dashboard -> /app redirect."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only run)", "frontend": "100% (5/5 scenarios)"},
+  "test_credentials": "demo@masterai.com / demo1234",
+  "seed_data_creation": "Created /tmp/test_notes.docx (Photosynthesis notes, ~37 KB) and /tmp/test_bad.png. Reset db.usage.document=0 in Mongo before the run so demo user could upload.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "To retest Learn-from-Documents: (a) run `mongosh test_database --eval 'db.usage.updateMany({},{$set:{document:0}})'` to reset the 2/month free-plan doc limit for the demo user; (b) create a small .docx (python-docx is installed) at /tmp/test_notes.docx and use `page.set_input_files('[data-testid=\"file-input\"]', path)` — the input is hidden but settable; (c) AI chunking takes ~10-15s, so wait_for_url('**/app/documents/**', timeout=60000); (d) the type-over engine listens on window keydown so simply page.keyboard.type(passage) after clicking body works; (e) dashboard mode card lives on /app (index route), NOT /app/dashboard.",
+  "rca of the issue": "No bugs — feature works end-to-end."
+}

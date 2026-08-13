@@ -2,13 +2,14 @@ import { NavLink, useNavigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
   Keyboard, House, GraduationCap, ChatCircleDots, Exam, Sparkle,
-  Trophy, UserCircle, CreditCard, SignOut, Flame, Lightning,
+  Trophy, UserCircle, CreditCard, SignOut, Flame, Lightning, FileText,
 } from "@phosphor-icons/react";
 
 const NAV = [
   { to: "/app", label: "Dashboard", icon: House, end: true },
   { to: "/app/typing", label: "Typing Practice", icon: Keyboard },
   { to: "/app/learn", label: "Learn from Scratch", icon: GraduationCap },
+  { to: "/app/documents", label: "Learn from Documents", icon: FileText },
   { to: "/app/ask", label: "Ask AI", icon: ChatCircleDots },
   { to: "/app/test", label: "Test Yourself", icon: Exam },
   { to: "/app/word", label: "Word of the Day", icon: Sparkle },

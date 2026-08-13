@@ -147,6 +147,43 @@ Each example is a natural sentence using the word. Plain text only, no markdown.
     return await _ask_json(system, prompt, "word_of_day")
 
 
+async def chunk_document(text: str, level: str, filename: str):
+    guide = LEVEL_GUIDE.get(level, LEVEL_GUIDE["Beginner"])
+    system = (
+        "You are MasterAI, a study-set builder. You output ONLY valid JSON, no prose, no markdown. "
+        f"Target reading level: {guide}"
+    )
+    prompt = f"""You are given raw text extracted from a document named "{filename}".
+Turn it into a type-over study set. Select the most important passages and CLEAN them for typing
+(fix broken line breaks, remove page numbers, headers/footers and OCR artefacts), but PRESERVE the
+original wording and meaning as closely as possible. Do NOT invent facts not in the document.
+
+Return JSON with EXACTLY this shape:
+{{
+  "title": "a concise title for this study set",
+  "subject": "short subject/category label",
+  "lessons": [
+    {{
+      "title": "lesson title",
+      "concept": "the single key concept (2-4 words)",
+      "blocks": ["a passage of plain text to be typed", "another passage"]
+    }}
+  ]
+}}
+
+Rules:
+- 4 to 6 lessons, each with 1-2 blocks.
+- Each block is 1-3 sentences of PLAIN text (it will be typed monkeytype-style), so no lists, no markdown,
+  no headings, no special characters beyond normal punctuation.
+- If the document is short, produce fewer lessons but at least 2.
+
+Document text:
+\"\"\"
+{text[:12000]}
+\"\"\""""
+    return await _ask_json(system, prompt, f"doc_{filename[:20]}")
+
+
 async def grade_sentence(word: str, sentence: str):
     system = (
         "You are MasterAI vocabulary coach. Output ONLY valid JSON. "

@@ -2,15 +2,16 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
   Keyboard, GraduationCap, ChatCircleDots, Exam, Sparkle, Trophy,
-  Flame, Lightning, ArrowRight, Target,
+  Flame, Lightning, ArrowRight, Target, FileText,
 } from "@phosphor-icons/react";
 
 const MODES = [
   { to: "/app/typing", title: "Typing Practice", desc: "Pure monkeytype reps. Free & unlimited.", icon: Keyboard, span: "lg:col-span-6", accent: true },
   { to: "/app/learn", title: "Learn from Scratch", desc: "AI builds a course. You type it into memory.", icon: GraduationCap, span: "lg:col-span-6" },
+  { to: "/app/documents", title: "Learn from Documents", desc: "Upload a PDF. Type through your own notes.", icon: FileText, span: "lg:col-span-4" },
   { to: "/app/ask", title: "Ask AI", desc: "Answers you type, not paste.", icon: ChatCircleDots, span: "lg:col-span-4" },
   { to: "/app/test", title: "Test Yourself", desc: "MCQ + AI-graded short answers.", icon: Exam, span: "lg:col-span-4" },
-  { to: "/app/word", title: "Word of the Day", desc: "Grow your vocabulary daily.", icon: Sparkle, span: "lg:col-span-4" },
+  { to: "/app/word", title: "Word of the Day", desc: "Grow your vocabulary daily.", icon: Sparkle, span: "lg:col-span-6" },
 ];
 
 export default function Dashboard() {

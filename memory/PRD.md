@@ -34,7 +34,8 @@ Shared Type-Over engine: display exact source text greyed out → capture keystr
 - Gamification: XP, streak, milestone badges, attempt_completed event
 
 ## Backlog (not yet built)
-- P1: Learn from Documents (PDF/DOCX/image upload → parse → chunk) — needs object storage + parser
+- P1: Learn from Documents (PDF/DOCX/TXT upload → parse → AI chunk → type-over) — DONE 2026-06 (build 2)
+- P1: Image/scanned-doc OCR upload (Gemini vision) — not yet
 - P1: Write & Remember (spaced revision of covered concepts)
 - P1: Streaming token-by-token generation into the type-over box
 - P2: Razorpay/Stripe real payments; Study Groups + shared streak challenges

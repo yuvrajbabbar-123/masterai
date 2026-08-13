@@ -11,6 +11,8 @@ import Dashboard from "@/pages/Dashboard";
 import TypingPractice from "@/pages/TypingPractice";
 import LearnScratch from "@/pages/LearnScratch";
 import CourseView from "@/pages/CourseView";
+import LearnDocuments from "@/pages/LearnDocuments";
+import DocumentView from "@/pages/DocumentView";
 import AskAI from "@/pages/AskAI";
 import TestYourself from "@/pages/TestYourself";
 import WordOfDay from "@/pages/WordOfDay";
@@ -50,6 +52,8 @@ function AppRouter() {
         <Route path="typing" element={<TypingPractice />} />
         <Route path="learn" element={<LearnScratch />} />
         <Route path="learn/:courseId" element={<CourseView />} />
+        <Route path="documents" element={<LearnDocuments />} />
+        <Route path="documents/:documentId" element={<DocumentView />} />
         <Route path="ask" element={<AskAI />} />
         <Route path="test" element={<TestYourself />} />
         <Route path="word" element={<WordOfDay />} />
