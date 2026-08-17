@@ -81,3 +81,12 @@ memory/test_credentials.md
 # Mobile development
 android-sdk/frontend/node_modules/.cache/default-development/0.pack
 archive.zip
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials
+archive
+(1).zip
+frontend/node_modules/.cache/default-development/0.pack
