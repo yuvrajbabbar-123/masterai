@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
+import InstallPrompt from "@/components/InstallPrompt";
 import { Keyboard } from "@phosphor-icons/react";
 
 import Login from "@/pages/Login";
@@ -72,6 +73,7 @@ export default function App() {
       <BrowserRouter>
         <AppRouter />
         <Toaster position="top-center" theme="dark" />
+        <InstallPrompt />
       </BrowserRouter>
     </AuthProvider>
   );

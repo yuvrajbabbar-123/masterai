@@ -42,7 +42,7 @@ export default function LearnScratch() {
       </div>
 
       <div className="max-w-2xl rounded-2xl border border-white/10 bg-[#171717] p-6">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <Input data-testid="topic-input" placeholder="What do you want to learn?" value={topic}
             onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => e.key === "Enter" && generate()}
             className="bg-[#0A0A0A] border-white/10 h-12 text-base" />

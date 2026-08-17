@@ -43,5 +43,11 @@ Shared Type-Over engine: display exact source text greyed out → capture keystr
 - P2: Timed Activity screen with countdown + AI Coach post-submit feedback
 
 ## Test Status
-Backend 19/19 pytest passing (all API). Frontend ~92% e2e (all major flows). Fixed: locked-level toast; reset demo usage.
+Backend 19/19 pytest passing (all API). Frontend e2e: build 1 all flows, build 2 Learn-from-Documents 5/5, build 3 (mobile + PWA) 7/7. All passing.
+
+## Build 3 (2026-06) — Mobile + PWA
+- Full mobile responsiveness: hamburger drawer nav (Sheet) on <md, responsive typography/spacing, stacked input rows, no horizontal overflow at 390px.
+- Type-Over engine rewritten to a hidden focusable <input> so mobile soft-keyboards appear (desktop typing unchanged) + tap-to-type overlay.
+- PWA: public/manifest.json (standalone, start_url /app/typing, 192/512 + apple-touch icons), public/sw.js service worker (network-first navigations, stale-while-revalidate assets, /api bypassed) registered in index.js.
+- "Add to Home Screen" InstallPrompt component (beforeinstallprompt + iOS Safari hint, dismissible).
 Demo account: demo@masterai.com / demo1234

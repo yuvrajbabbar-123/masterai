@@ -41,7 +41,7 @@ export default function AskAI() {
         <p className="text-[#A3A3A3] mt-2">No copy-paste. The answer arrives as a type-over rep so it actually sticks.</p>
       </div>
 
-      <div className="max-w-2xl flex gap-3">
+      <div className="max-w-2xl flex flex-col sm:flex-row gap-3">
         <Input data-testid="question-input" placeholder="Ask anything…" value={question}
           onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()}
           className="bg-[#0A0A0A] border-white/10 h-12 text-base" />

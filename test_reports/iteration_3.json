@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend-only verification of the mobile-responsive + PWA + rewritten input-based Type-Over engine changes. ALL 7 requested scenarios PASS. (1) Desktop regression @1920x800: demo login lands on /app/typing, clicking [type-over-engine] focuses the hidden [type-input], page.keyboard.type of the source passage produces live wpm/accuracy and a completion result-card (observed 838 wpm / 100% acc / 3s with restart-button). (2) Desktop Ask AI regression: submitting a question renders the answer as a type-over block; typing it to completion shows the result-card. (3) Mobile @390x844: sidebar aside is display:none, [mobile-menu-button] hamburger visible; clicking it opens the Sheet drawer containing all 8 nav testids (nav-typing-practice, nav-learn-from-scratch, nav-learn-from-documents, nav-ask-ai, nav-test-yourself, nav-word-of-the-day, nav-leaderboard, nav-profile); clicking nav-profile inside the [role='dialog'] navigates to /app/profile and closes the drawer. (4) Mobile typing: [tap-to-type] overlay disappears on tap, document.activeElement is the [type-input], typing completes and produces result-card + restart-button (1004 wpm / 100% acc on the seeded short word list). (5) Mobile layout sanity: /app, /app/learn, /app/test, /app/word, /app/profile, /app/subscription, /app/typing all render with scrollWidth==clientWidth==390 → NO horizontal overflow. (6) PWA: GET /manifest.json → 200, name 'MasterAI — Learn with AI. Master without it.', start_url '/app/typing', display 'standalone', theme_color '#0A0A0A', icons include 192x192 & 512x512. GET /sw.js → 200 application/javascript, 1938 bytes. navigator.serviceWorker.getRegistrations() returns scope 'https://neural-keystroke.preview.emergentagent.com/'. (7) Install prompt: absent on load (expected in headless Chromium); dispatching a synthetic 'beforeinstallprompt' event correctly renders [install-prompt] with [install-accept] and [install-dismiss] buttons.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Layout.jsx mounts NavContents twice (desktop aside + mobile Sheet) — every nav item's data-testid renders twice in the DOM. Not a functional bug but any test using `[data-testid=\"nav-*\"]` without `.first` / scoping will get 2 matches; recommend scoping the mobile Sheet nav ids with a prefix (e.g. `mobile-nav-profile`) or filtering by visibility.",
+    "TypeOverEngine.jsx: caret-position useEffect depends on `input, chars` and reads getBoundingClientRect on every render — on very long passages this can cause layout thrashing on low-end mobile. Consider debouncing or using requestAnimationFrame.",
+    "TypeOverEngine.jsx: `handleChange` uses setInput with a functional updater that also mutates keysTyped/keysCorrect refs via a for-loop — with React 18 StrictMode double-invocation of state updaters, ref counters could double-count in dev. Prefer computing counters outside the setState updater based on prev/val diff.",
+    "sw.js only 1938 bytes — verify precache list actually covers /app/typing shell and offline fallback; not verified in this run.",
+    "manifest.json `scope: '/'` combined with `start_url: '/app/typing'` is fine, but the SPA still requires the JS bundle; ensure sw.js precaches the built index.html / hashed bundle chunks for real offline support."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only run)", "frontend": "100% (7/7 scenarios)"},
+  "test_credentials": "demo@masterai.com / demo1234",
+  "seed_data_creation": "Reset db.usage.updateMany({},{$set:{course:0,ask:0,quiz:0,document:0}}) before the run so the demo user's free-plan ask quota wouldn't block the Ask AI regression.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Every sidebar nav data-testid is rendered twice (desktop aside + mobile Sheet). To click the one visible on mobile, scope with `[role=\"dialog\"] [data-testid=\"nav-*\"]` after opening [mobile-menu-button]; on desktop the mobile Sheet is not in the DOM so plain testid works. Typing engine now uses `<input data-testid=\"type-input\">` — to type: click [type-over-engine] (or focus [type-input]) then page.keyboard.type(text) with a small delay (6-8ms) works reliably. Extract passage via `el.querySelectorAll('div')[last].innerText.replace(/\\s+/g,' ').trim()`. On completion the parent page (TypingPractice / AskAI) replaces the engine with a ResultCard, so [live-wpm] disappears after completion — assert [result-card] and [restart-button] instead. InstallPrompt won't show in headless Chromium; dispatch `new Event('beforeinstallprompt')` on window to force-render it.",
+  "rca of the issue": "No bugs found."
+}

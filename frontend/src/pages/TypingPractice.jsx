@@ -34,12 +34,12 @@ export default function TypingPractice() {
 
   return (
     <div className="min-h-[70vh] flex flex-col" data-testid="typing-practice">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-display text-3xl font-bold tracking-tight">Typing Practice</h1>
           <p className="text-[#A3A3A3] text-sm mt-1">The pure mechanic. Just start typing.</p>
         </div>
-        <div className="flex gap-1 p-1 rounded-full border border-white/10 bg-[#171717]">
+        <div className="flex gap-1 p-1 rounded-full border border-white/10 bg-[#171717] w-fit">
           <TabBtn active={mode === "words"} onClick={() => setMode("words")} icon={TextAa} label="Words" testid="mode-words" />
           <TabBtn active={mode === "quote"} onClick={() => setMode("quote")} icon={Quotes} label="Quote" testid="mode-quote" />
         </div>
