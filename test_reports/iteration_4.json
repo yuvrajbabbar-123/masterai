@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only smoke/regression verification of the date-fns 4.1.0 -> ^3.6.0 downgrade. Verified installed tree: node_modules/date-fns = 3.6.0, yarn.lock resolves date-fns@^3.6.0 -> 3.6.0, react-day-picker still 8.10.1. Runtime: login with demo@masterai.com/demo1234 via [email-input]/[password-input]/[submit-auth-button] redirects to /app/typing with no blank screen. Typing engine regression PASSED: extracted 198-char passage, click [type-over-engine] focuses [type-input], live [live-wpm] updated mid-run (98 wpm, 100% acc, 0/198 counter working), typing to completion rendered [result-card] (824 wpm / 100% / 3s) + [restart-button] and a '+102 XP / Streak 3 days' toast. Navigated all 8 requested routes (/app, /app/learn, /app/ask, /app/test, /app/word, /app/profile, /app/leaderboard, /app/subscription) — every page rendered non-empty content (textLen 300-1081) with ZERO new console errors and no pageerror. NO console errors mentioning date-fns, react-day-picker, Calendar, 'Module not found' or 'Cannot find module' anywhere. Only console noise observed: two 401 responses on the /login page before authentication (expected — unauthenticated /api/auth/me probe).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Login page fires an unauthenticated auth-me request that logs two 401s to the console before login; consider skipping the probe when no masterai_token exists to keep the console clean.",
+    "date-fns 3.6.0 is API-compatible with react-day-picker 8.10.1; if the project later upgrades to react-day-picker v9 remember to move date-fns back to v4 in the same commit to avoid a new ERESOLVE conflict.",
+    "src/components/ui/calendar.jsx is currently not mounted by any tested route, so the date-fns path is only validated at bundle/module-resolution level (build + no runtime module errors), not through an actual rendered Calendar interaction."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only run)", "frontend": "100% (4/4 requested scenarios)"},
+  "seed_data_creation": "Reset db.usage.updateMany({},{$set:{course:0,ask:0,quiz:0,document:0}}) before the run to clear demo-user AI quotas.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "demo@masterai.com / demo1234",
+  "context_for_next_testing_agent": "Login testids are [email-input], [password-input], [submit-auth-button] (NOT login-email/login-password). Typing flow: read passage via last inner div innerText of [type-over-engine], click [type-over-engine] (focuses [type-input]), then page.keyboard.type(text, delay=6); on completion [live-wpm] is replaced by [result-card]+[restart-button]. Sidebar nav testids render twice (desktop aside + mobile Sheet) — scope accordingly. date-fns downgrade verified clean; no regression.",
+  "rca_of_the_issue": "No issues found. date-fns 3.6.0 satisfies react-day-picker@8.10.1's peer range (^2.28.0 || ^3.0.0), and no application code imports date-fns v4-only APIs, so the downgrade is runtime-neutral."
+}
