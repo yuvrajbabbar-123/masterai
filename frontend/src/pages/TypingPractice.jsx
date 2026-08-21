@@ -25,7 +25,7 @@ export default function TypingPractice() {
     }
   }, [mode]);
 
-  useEffect(() => { load(mode); /* eslint-disable-next-line */ }, [mode]);
+  useEffect(() => { load(); }, [load]);
 
   const onComplete = async (stats) => {
     setResult(stats);
