@@ -1,0 +1,30 @@
+{
+  "summary": "Focused frontend regression on Typing Practice (/app/typing) after the useEffect dependency fix (useEffect(() => { load(); }, [load])). Logged in with demo@masterai.com, verified initial text load, mode switching (Words/Quote), new-text button, full typing completion -> result-card -> restart, and absence of any refetch loop. All 5 requested checks PASS. ESLint on TypingPractice.jsx is clean (react-hooks/exhaustive-deps resolved).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TypingPractice", "issue": "Button label reads 'new text \u00b7 tab' but pressing the Tab key does not fetch a new text (no keydown handler). Pre-existing, unrelated to this fix - either implement the Tab shortcut or drop '\u00b7 tab' from the label.", "selector": "[data-testid=\"new-text-button\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Typing Practice", "issues": ["'Tap here to start typing' overlay pill renders vertically centered on top of the passage text (overlaps line 3) when the hidden input is not focused; slightly obscures the text. Cosmetic/pre-existing."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional (LOW): implement Tab keyboard shortcut for new text or remove '\u00b7 tab' from the button label.",
+    "Optional (LOW): reposition the 'Tap here to start typing' overlay so it does not overlap the passage."
+  ],
+  "critical_code_review_comments": [
+    "load = useCallback(async (m = mode) => {...}, [mode]) with useEffect(() => { load(); }, [load]) is correct: the callback identity changes only on mode change, so exactly one fetch per mount and one per mode change. Verified 2 requests per mount in dev (React StrictMode double-invoke) and 0 additional requests over 6s idle - no loop.",
+    "load() has no catch branch; a failed /typing/random leaves text empty with no error UI (loading is cleared by finally). Consider an error state + retry."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "not tested", "frontend": "100% (5/5 requested regression checks passed)" },
+  "seed_data_creation": "None. Used existing demo account; typing attempts were recorded for demo@masterai.com (XP/streak incremented).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "demo@masterai.com / demo1234 (from /app/memory/test_credentials.md) - works",
+  "context_for_next_testing_agent": "Typing flow verification recipe: login via [email-input]/[password-input]/[submit-auth-button] -> auto-lands on /app/typing. Read passage text from '[data-testid=\"type-over-engine\"] .cursor-text > div:last-child' (replace \\xa0 with space), click that container then page.keyboard.type(text, delay=6) -> [result-card] + [restart-button] appear. Instrument page.on('request') filtering '/typing/random' to detect refetch loops; expect 2 per mount in dev (StrictMode).",
+  "rca_of_the_issue": "Original CI failure was an ESLint exhaustive-deps error only. The fix ([load] dependency on a useCallback memoized by [mode]) is behaviourally equivalent; regression testing confirms single fetch per mount/mode-change, no infinite effect loop, and lint is clean."
+}
