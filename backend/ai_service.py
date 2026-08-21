@@ -1,11 +1,11 @@
 import os
 import json
 import re
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+import httpx
 
-EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
-MODEL_PROVIDER = "gemini"
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 MODEL_NAME = "gemini-3-flash-preview"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
 
 LEVEL_GUIDE = {
     "Beginner": "very simple language, short sentences (~12-18 words each), everyday vocabulary.",
@@ -15,12 +15,24 @@ LEVEL_GUIDE = {
 }
 
 
-def _chat(system_message: str, session_id: str) -> LlmChat:
-    return LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=session_id,
-        system_message=system_message,
-    ).with_model(MODEL_PROVIDER, MODEL_NAME)
+async def _generate(system: str, prompt: str, json_mode: bool = False) -> str:
+    payload = {
+        "system_instruction": {"parts": [{"text": system}]},
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.8},
+    }
+    if json_mode:
+        payload["generationConfig"]["responseMimeType"] = "application/json"
+    async with httpx.AsyncClient(timeout=50) as client:
+        r = await client.post(
+            GEMINI_URL,
+            headers={"x-goog-api-key": GEMINI_API_KEY},
+            json=payload,
+        )
+    r.raise_for_status()
+    data = r.json()
+    parts = data["candidates"][0]["content"]["parts"]
+    return "".join(p.get("text", "") for p in parts)
 
 
 def _extract_json(text: str):
@@ -35,11 +47,8 @@ def _extract_json(text: str):
     return json.loads(text)
 
 
-async def _ask_json(system: str, prompt: str, session_id: str):
-    chat = _chat(system, session_id)
-    resp = await chat.send_message(UserMessage(text=prompt))
-    if not isinstance(resp, str):
-        resp = str(resp)
+async def _ask_json(system: str, prompt: str, session_id: str = None):
+    resp = await _generate(system, prompt, json_mode=True)
     return _extract_json(resp)
 
 
@@ -85,10 +94,8 @@ async def ask_ai(question: str, level: str) -> str:
         "Return ONLY the answer as plain prose (2-5 sentences). No markdown, no lists, no headings, "
         "no special characters beyond normal punctuation, because the learner will type your exact words."
     )
-    chat = _chat(system, f"ask_{question[:20]}")
-    resp = await chat.send_message(UserMessage(text=question))
-    if not isinstance(resp, str):
-        resp = str(resp)
+    chat_system = system
+    resp = await _generate(chat_system, question)
     # sanitize to typing-friendly text
     resp = resp.replace("\n", " ").replace("*", "").replace("#", "").strip()
     resp = re.sub(r"\s+", " ", resp)

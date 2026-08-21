@@ -1,0 +1,30 @@
+{
+  "summary": "Backend-only verification of the LLM provider swap (Emergent universal key -> user's own Gemini key, direct REST v1beta gemini-3-flash-preview). Created /app/backend/tests/test_ai_gemini.py (10 pytest cases) and ran it against the public REACT_APP_BACKEND_URL. All 10 passed: /api/ai/ask (plain prose, no markdown/newlines, 2-5 sentences), /api/ai/word-of-day (word/part_of_speech/meaning + exactly 3 examples), /api/ai/course (title/description/subject + exactly 3 modules x 2 lessons x 1-2 blocks, persisted and retrievable via GET /api/courses/{id}, no _id leak), /api/ai/quiz (4 MCQ with exactly 4 options + valid correct_index, 2 short with rubric), /api/ai/grade-short (pass and fail cases score/passed/feedback consistent), /api/ai/grade-sentence (correct usage passes, garbled usage fails), /api/documents/upload with .txt (study set with 4 lessons, persisted) and auth guard (401/403 without token). Additionally verified .docx upload (200, title 'The Amazon Rainforest', 4 lessons) and that the 3rd upload correctly returns 402 plan limit. No 500s observed. Direct-Gemini latencies measured on localhost: ask 8.2s, word 4.9s, quiz 11.7s, course 7.1s.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "ai_service._generate", "issue": "GEMINI_API_KEY is passed as a URL query param, so httpx's INFO logs print the full API key in /var/log/supervisor/backend.err.log (secret leak in logs). Use the 'x-goog-api-key' header instead, or silence httpx logging."},
+      {"endpoint": "/api/ai/*", "issue": "No retry/backoff on transient Gemini failures (429/5xx) and httpx timeout is 90s while the k8s ingress cuts off at ~60s -> user sees a 502 HTML page instead of a JSON error. Recommend timeout <55s + 1 retry, or streaming/async job."},
+      {"endpoint": "/api/ai/*", "issue": "First test run returned a single 502 because a file write in /app/backend triggered uvicorn --reload mid-request (dev-only artefact, not reproducible afterwards). Worth noting: in-flight AI requests are dropped on reload."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_ai_gemini.py", "/app/test_reports/pytest/ai_gemini_results.xml"],
+  "action_items": [
+    "Stop leaking GEMINI_API_KEY in logs: send the key via the x-goog-api-key header (not ?key=) and/or set httpx logger to WARNING.",
+    "Lower httpx timeout below the ~60s ingress limit and add one retry for 429/503 from Gemini so users get a JSON error rather than a 502 HTML page."
+  ],
+  "critical_code_review_comments": [
+    "ai_service.py reads os.environ['GEMINI_API_KEY'] at import time; if the key is missing the whole FastAPI app fails to boot (observed KeyError in backend.err.log before the env was reloaded). Fail-fast is fine, but the app requires a supervisor restart after any .env change - document it.",
+    "_generate does not check for blocked/empty candidates (promptFeedback / finishReason SAFETY); data['candidates'][0] will raise KeyError/IndexError and surface as a generic 500. Add an explicit guard with a clear 4xx/502 message.",
+    "_extract_json's regex fallback is fine, but with responseMimeType=application/json a json.JSONDecodeError should be surfaced as a retry rather than a 500."
+  ],
+  "updated_files": ["/app/backend/tests/test_ai_gemini.py"],
+  "success_rate": {"backend": "100% (10/10 pytest + 2 ad-hoc docx/plan-limit checks)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Used existing demo@masterai.com account. Created TEST_-prefixed courses/documents and deleted them afterwards; usage counters reset to 0 in test_database.usage.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "demo@masterai.com / demo1234 - works, returns JWT 'token'",
+  "context_for_next_testing_agent": "AI regression suite: /app/backend/tests/test_ai_gemini.py (run `cd /app/backend && python -m pytest tests/test_ai_gemini.py -v`, ~2 min). Free-plan monthly caps (course 3, ask 10, quiz 50, document 2, word 31) will 402 after a couple of runs - reset with: mongosh test_database --eval 'db.usage.updateMany({},{$set:{course:0,ask:0,quiz:0,document:0,word:0}})'. Avoid writing files under /app/backend while AI requests are in flight (uvicorn reload kills them -> 502).",
+  "rca_of_the_issue": "No functional defect found in the provider swap. The one 502 seen initially was caused by uvicorn --reload restarting the backend mid-request (triggered by creating the test file inside /app/backend), not by the Gemini integration; re-running the identical suite passed 10/10. Residual risk is the 90s httpx timeout exceeding the ~60s ingress timeout, which would surface as a 502 HTML page for slow generations."
+}
