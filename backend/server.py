@@ -14,7 +14,8 @@ load_dotenv(ROOT_DIR / ".env")
 from models import (
     RegisterRequest, LoginRequest, GoogleSessionRequest, User,
     CourseRequest, AskRequest, QuizRequest, GradeShortRequest,
-    GradeSentenceRequest, AttemptRequest, LevelUpdate, now_utc, new_id,
+    GradeSentenceRequest, AttemptRequest, LevelUpdate, WordLookupRequest,
+    now_utc, new_id,
 )
 from auth import hash_password, verify_password, create_jwt, make_authenticator
 import ai_service
@@ -65,7 +66,8 @@ async def get_usage(user_id: str) -> dict:
     return doc
 
 
-async def check_and_consume(user: dict, action: str):
+async def check_limit(user: dict, action: str):
+    """Raise 402 if the user is at their plan limit. Does NOT consume."""
     limits = PRO_MONTHLY_LIMITS if user.get("plan") == "Pro" else FREE_MONTHLY_LIMITS
     usage = await get_usage(user["user_id"])
     used = usage.get(action, 0)
@@ -73,14 +75,30 @@ async def check_and_consume(user: dict, action: str):
     if used >= limit:
         raise HTTPException(status_code=402,
                             detail=f"You've reached your {user.get('plan','Free')} plan limit for this feature. Upgrade to Pro for more.")
+
+
+async def consume(user: dict, action: str):
+    """Increment usage + ledger. Call ONLY after a successful AI generation."""
+    limits = PRO_MONTHLY_LIMITS if user.get("plan") == "Pro" else FREE_MONTHLY_LIMITS
+    usage = await get_usage(user["user_id"])
+    used = usage.get(action, 0)
+    limit = limits.get(action, 9999)
     await db.usage.update_one(
         {"user_id": user["user_id"], "month": month_key()},
         {"$inc": {action: 1}},
     )
     await db.credit_ledger.insert_one({
         "user_id": user["user_id"], "action": action, "reason": f"AI {action} generation",
-        "at": now_utc().isoformat(), "balance_after": limit - used - 1,
+        "at": now_utc().isoformat(), "balance_after": max(0, limit - used - 1),
     })
+
+
+def _ai_http_error(e: Exception) -> HTTPException:
+    """Translate an ai_service error into a sanitised HTTPException (never leaks provider details)."""
+    if isinstance(e, ai_service.AIError):
+        return HTTPException(status_code=e.status, detail=e.message)
+    logger.exception("AI call failed")
+    return HTTPException(status_code=503, detail="AI is temporarily unavailable. Please try again in a moment.")
 
 
 # ================= AUTH =================
@@ -155,13 +173,13 @@ async def logout(request: Request, response: Response):
 # ================= AI FEATURES =================
 @api_router.post("/ai/course")
 async def ai_course(body: CourseRequest, current=Depends(get_current_user)):
-    await check_and_consume(current, "course")
+    await check_limit(current, "course")
     level = body.level or current.get("learning_level", "Beginner")
     try:
-        data = await ai_service.generate_course(body.topic, level)
+        data = await ai_service.generate_course(body.topic, level, body.known_concepts)
     except Exception as e:
-        logger.exception("course gen failed")
-        raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
+        raise _ai_http_error(e)
+    await consume(current, "course")
     course = {
         "course_id": new_id("course"), "user_id": current["user_id"],
         "topic": body.topic, "level": level, "created_at": now_utc().isoformat(),
@@ -192,24 +210,38 @@ async def upload_document(file: UploadFile = File(...), current=Depends(get_curr
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Max 10 MB.")
-    try:
-        text = document_service.extract_text(file.filename, content)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Could not read this file. Try a different PDF/DOCX/TXT.")
-    if len(text) < 40:
-        raise HTTPException(status_code=400, detail="Not enough readable text found in this document.")
 
-    # only consume a credit once we know we can process the file
-    await check_and_consume(current, "document")
+    name = (file.filename or "").lower()
+    ctype = file.content_type or ""
+    is_image = ctype.startswith("image/") or name.endswith((".png", ".jpg", ".jpeg", ".webp", ".heic"))
+
+    await check_limit(current, "document")
+
+    if is_image:
+        try:
+            text = await ai_service.ocr_image(content, ctype or "image/png")
+        except Exception as e:
+            raise _ai_http_error(e)
+        text = (text or "").strip()
+        if len(text) < 20:
+            raise HTTPException(status_code=400, detail="No readable text found in this image.")
+    else:
+        try:
+            text = document_service.extract_text(file.filename, content)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Could not read this file. Try a different PDF/DOCX/TXT or an image.")
+        if len(text) < 40:
+            raise HTTPException(status_code=400, detail="Not enough readable text found in this document.")
+
     level = current.get("learning_level", "Beginner")
     try:
         data = await ai_service.chunk_document(text, level, file.filename)
     except Exception as e:
-        logger.exception("doc chunk failed")
-        raise HTTPException(status_code=500, detail=f"AI processing failed: {e}")
+        raise _ai_http_error(e)
 
+    await consume(current, "document")
     doc = {
         "document_id": new_id("doc"), "user_id": current["user_id"],
         "filename": file.filename, "level": level, "created_at": now_utc().isoformat(),
@@ -236,23 +268,25 @@ async def get_document(document_id: str, current=Depends(get_current_user)):
 
 @api_router.post("/ai/ask")
 async def ai_ask(body: AskRequest, current=Depends(get_current_user)):
-    await check_and_consume(current, "ask")
+    await check_limit(current, "ask")
     level = body.level or current.get("learning_level", "Beginner")
     try:
         answer = await ai_service.ask_ai(body.question, level)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
+        raise _ai_http_error(e)
+    await consume(current, "ask")
     return {"question": body.question, "answer": answer}
 
 
 @api_router.post("/ai/quiz")
 async def ai_quiz(body: QuizRequest, current=Depends(get_current_user)):
-    await check_and_consume(current, "quiz")
+    await check_limit(current, "quiz")
     level = body.level or current.get("learning_level", "Beginner")
     try:
         data = await ai_service.generate_quiz(body.topic, level)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
+        raise _ai_http_error(e)
+    await consume(current, "quiz")
     return data
 
 
@@ -261,16 +295,37 @@ async def ai_grade_short(body: GradeShortRequest, current=Depends(get_current_us
     try:
         return await ai_service.grade_short(body.question, body.answer, body.rubric)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI grading failed: {e}")
+        raise _ai_http_error(e)
 
 
 @api_router.get("/ai/word-of-day")
 async def ai_word(current=Depends(get_current_user)):
-    await check_and_consume(current, "word")
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    cached = await db.word_of_day.find_one({"date": today}, {"_id": 0})
+    if cached:
+        cached.pop("date", None)
+        return cached
     try:
-        return await ai_service.word_of_the_day()
+        data = await ai_service.word_of_the_day()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
+        raise _ai_http_error(e)
+    await db.word_of_day.update_one({"date": today}, {"$set": {**data, "date": today}}, upsert=True)
+    return data
+
+
+@api_router.post("/ai/word-lookup")
+async def ai_word_lookup(body: WordLookupRequest, current=Depends(get_current_user)):
+    word = (body.word or "").strip()
+    if not word or len(word) > 60:
+        raise HTTPException(status_code=400, detail="Please enter a valid word.")
+    await check_limit(current, "word")
+    try:
+        data = await ai_service.word_details(word)
+    except Exception as e:
+        raise _ai_http_error(e)
+    await consume(current, "word")
+    return data
 
 
 @api_router.post("/ai/grade-sentence")
@@ -278,7 +333,7 @@ async def ai_grade_sentence(body: GradeSentenceRequest, current=Depends(get_curr
     try:
         return await ai_service.grade_sentence(body.word, body.sentence)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI grading failed: {e}")
+        raise _ai_http_error(e)
 
 
 # ================= TYPING PRACTICE (free) =================

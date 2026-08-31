@@ -16,6 +16,7 @@ export default function DocumentView() {
 
   return (
     <LessonRunner
+      key={doc.document_id}
       title={doc.title}
       subject={doc.subject || doc.filename}
       steps={documentToSteps(doc)}

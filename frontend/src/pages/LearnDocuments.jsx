@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { FileText, UploadSimple, FilePdf, FileDoc, ArrowRight, CircleNotch } from "@phosphor-icons/react";
+import { FileText, UploadSimple, FilePdf, FileDoc, FileImage, ArrowRight, CircleNotch } from "@phosphor-icons/react";
 
 export default function LearnDocuments() {
   const navigate = useNavigate();
@@ -55,7 +55,7 @@ export default function LearnDocuments() {
           dragOver ? "border-[#EAB308] bg-[#EAB308]/5" : "border-white/15 bg-[#171717] hover:border-white/30"
         }`}
       >
-        <input ref={inputRef} type="file" accept=".pdf,.docx,.txt,.md" className="hidden"
+        <input ref={inputRef} type="file" accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,image/*" className="hidden"
           data-testid="file-input" onChange={(e) => upload(e.target.files?.[0])} />
         {busy ? (
           <div className="flex flex-col items-center gap-3 text-[#A3A3A3]">
@@ -68,7 +68,7 @@ export default function LearnDocuments() {
               <UploadSimple size={28} weight="bold" className="text-[#EAB308]" />
             </div>
             <p className="font-medium">Drop a file here, or <span className="text-[#EAB308]">browse</span></p>
-            <p className="text-xs text-[#525252] font-mono-type">PDF · DOCX · TXT · MD — up to 10 MB</p>
+            <p className="text-xs text-[#525252] font-mono-type">PDF · DOCX · TXT · Image (JPG/PNG) — up to 10 MB</p>
           </div>
         )}
       </div>
@@ -78,7 +78,8 @@ export default function LearnDocuments() {
           <h2 className="font-display text-xl font-bold mb-4">Your Documents</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {docs.map((d) => {
-              const Icon = d.filename?.toLowerCase().endsWith(".pdf") ? FilePdf : FileDoc;
+              const fn = d.filename?.toLowerCase() || "";
+              const Icon = fn.endsWith(".pdf") ? FilePdf : /\.(png|jpe?g|webp|heic)$/.test(fn) ? FileImage : FileDoc;
               return (
                 <button key={d.document_id} onClick={() => navigate(`/app/documents/${d.document_id}`)}
                   data-testid={`document-${d.document_id}`}

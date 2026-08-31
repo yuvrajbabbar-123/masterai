@@ -42,8 +42,20 @@ Shared Type-Over engine: display exact source text greyed out → capture keystr
 - P2: Certification/shareable badges; notifications (FCM); PostHog analytics
 - P2: Timed Activity screen with countdown + AI Coach post-submit feedback
 
+## Build 4 (2026-08) — 5 UX features + AI hardening
+- Learn from Scratch: "Learn More" button on completion generates a DEEPER next course (known_concepts continuation) = infinity loop; Restart + Test Yourself retained. Fixed stale-step bug via key={courseId} on LessonRunner.
+- Ask AI: after typing the answer, two CTAs — "🔥 One More Round" (re-type same answer) and "😌 I'm Good for Today" (reset).
+- Word of the Day: auto daily word (now cached per-day in db.word_of_day, no credit burn) + own-word lookup (/ai/word-lookup).
+- Spacebar acts as next/try-again/continue on all result & completion screens.
+- Learn from Documents: now accepts image uploads (JPG/PNG) OCR'd via Gemini vision (ai_service.ocr_image).
+- AI robustness: AIError type + retry/backoff in ai_service._post_gemini; sanitised error messages (no provider URL/model leaked); credits consumed only AFTER successful generation (check_limit before, consume after) so failures never burn quota.
+
+## Integrations (current)
+- LLM: user's OWN Google Gemini key (gemini-3-flash-preview) via direct REST, key sent as x-goog-api-key header (not logged). NOTE: free-tier Gemini keys cap ~20 requests/day.
+- DB: user's MongoDB Atlas cluster masterai.un9wvnh.mongodb.net (migrated from local; DB_NAME=test_database).
+
 ## Test Status
-Backend 19/19 pytest passing (all API). Frontend e2e: build 1 all flows, build 2 Learn-from-Documents 5/5, build 3 (mobile + PWA) 7/7. All passing.
+Backend: iteration_8 7/7 pytest pass. Frontend: iterations 1-8 all core flows pass; infinity-loop stale-state bug fixed with key remount (deterministic).
 
 ## Build 3 (2026-06) — Mobile + PWA
 - Full mobile responsiveness: hamburger drawer nav (Sheet) on <md, responsive typography/spacing, stacked input rows, no horizontal overflow at 390px.

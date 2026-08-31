@@ -50,6 +50,11 @@ class User(BaseModel):
 class CourseRequest(BaseModel):
     topic: str
     level: Optional[str] = None
+    known_concepts: Optional[List[str]] = None
+
+
+class WordLookupRequest(BaseModel):
+    word: str
 
 
 class AskRequest(BaseModel):

@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 8 focused re-test of the 4 items requested (Gemini quota was available). Backend: 7/7 pytest cases pass in /app/backend/tests/test_iteration8.py (Word-of-Day per-day cache + zero credit burn, word-lookup returns requested word and consumes exactly 1 credit, no credit burn on rejected/failed calls, sanitised error messages, auth guards, 422 validation). Frontend: Learn-from-Documents IMAGE OCR works end to end (PIL-generated PNG -> OCR -> /app/documents/<id> with type-over lessons matching the image text, typed at 100% accuracy). Learn-from-Scratch INFINITY LOOP: course generation, full type-through, 'Building next level…' label and navigation to a NEW deeper course all work — BUT the new course opens with STALE progress (started at passage 7/12; in an earlier run where the next course had the same number of passages it opened straight on the 'Complete!' screen). Word of the Day is cached per day (same word 'Tenacious' on reload) and own-word lookup ('ephemeral') works.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Learn from Scratch -> Learn More (infinity loop)",
+        "issue": "HIGH: LessonRunner's internal step/result state is not reset when CourseView navigates to the next course id (same route component stays mounted). Reproduced twice: (1) old course 6 steps -> new course 12 steps => new course opens at passage 7/12, silently SKIPPING the first 6 passages of the new (deeper) course, progress bar already ~50%; (2) old course 6 steps -> new course 6 steps => new course renders the 'Complete!' screen immediately and cannot be typed at all (a manual page reload fixes it, confirming stale state, not bad data). Fix: render <LessonRunner key={courseId} ...> in CourseView.jsx (and/or reset step/result in a useEffect keyed on steps/title in LessonRunner.jsx).",
+        "affected_selectors": ["[data-testid='learn-more-button']", "[data-testid='runner-complete']", "[data-testid='lesson-runner']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration8.py",
+    "/app/test_reports/pytest/iter8.xml"
+  ],
+  "action_items": [
+    "Reset LessonRunner progress when the course changes (key={courseId} on LessonRunner in CourseView.jsx) — currently the infinity loop either skips the first N passages of the new course or lands the user straight on 'Complete!'."
+  ],
+  "critical_code_review_comments": [
+    "CourseView.jsx: in-place navigate() to a sibling route param reuses the mounted LessonRunner; any child holding step state must be keyed by courseId. Same class of bug would appear for DocumentView if documents ever chain.",
+    "server.py /ai/word-of-day cache is global (keyed only by date) — acceptable per PRD (one word per day for everyone) but note it also means the very first user of the day pays the Gemini call; consider a small lock if concurrent first-hits matter.",
+    "Verified consume() runs only after a successful AI call: a rejected .txt upload (too little text) and an invalid word-lookup consumed 0 credits; credit_ledger balances (course 2,1,0 / document 1 / word 29) are consistent."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration8.py"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "75% (3/4 flows fully pass; infinity loop navigates but resumes with stale progress)"},
+  "seed_data_creation": "Generated 3 demo courses (course_acc6ca14fe4e 'French Greetings for Beginners', course_71be2c6ee870 'Polite French Interactions', course_403648b4dc24 'Casual and Specific French Greetings') and 1 document (doc_af56ea3db065 'Photosynthesis Basics' from /tmp/TEST_ocr_notes.png) on demo@masterai.com. Plan usage counters were reset to 0 after testing so the demo account is immediately usable.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "demo@masterai.com / demo1234 (from /app/memory/test_credentials.md)",
+  "context_for_next_testing_agent": "Gemini free-tier: ~7 requests were spent this iteration (1 word-lookup API, 3 courses, 1 image OCR+chunk = 2, 1 word-lookup UI). Word-of-Day is cached in db.word_of_day (date 2026-08-31 -> 'Tenacious') so it costs nothing to re-test. IMPORTANT test technique: when reading the passage under [data-testid='type-over-engine'], scope the leaf-span join to the inner container matching [class*='cursor-text'] and skip .type-caret — otherwise the wpm/accuracy stat spans get prepended and typing goes wrong (that produced a false 'skipped steps' result initially). To re-verify the infinity-loop fix without spending quota, open an existing 6-step course, type through it, and click learn-more only once.",
+  "rca_of_the_issue": "Root cause of the infinity-loop defect: CourseView renders LessonRunner, which keeps `step` in useState with no reset when its `steps` prop changes. learnMore() calls navigate('/app/learn/<newId>') — React Router keeps the same CourseView/LessonRunner instance, so `step` (== old total) survives. done = step >= total therefore yields either an immediate 'Complete!' screen (new total <= old step) or a mid-course start (new total > old step). Reproduction: complete any course, click [data-testid='learn-more-button'], observe progress counter of the new course. Mitigation: key LessonRunner by courseId or reset step/result in an effect on course change."
+}

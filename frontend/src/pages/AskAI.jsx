@@ -15,10 +15,11 @@ export default function AskAI() {
   const [answer, setAnswer] = useState(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [round, setRound] = useState(0);
 
   const ask = async () => {
     if (!question.trim()) return;
-    setBusy(true); setAnswer(null); setResult(null);
+    setBusy(true); setAnswer(null); setResult(null); setRound(0);
     try {
       const res = await api.post("/ai/ask", { question });
       setAnswer(res.data.answer);
@@ -31,6 +32,9 @@ export default function AskAI() {
     setResult(stats);
     await recordAttempt({ mode: "ask", wpm: stats.wpm, accuracy: stats.accuracy, chars: stats.chars, subject: "Ask AI", passed: stats.accuracy >= 80 }, refreshUser);
   };
+
+  const oneMoreRound = () => { setResult(null); setRound((r) => r + 1); };
+  const goodForToday = () => { setResult(null); setAnswer(null); setQuestion(""); setRound(0); };
 
   return (
     <div className="space-y-8" data-testid="ask-ai">
@@ -54,11 +58,22 @@ export default function AskAI() {
       {answer && (
         <div className="max-w-4xl border-l-4 border-[#EAB308] pl-6 py-2 fade-up">
           {result ? (
-            <ResultCard result={result} onRestart={() => { setResult(null); }} label="type again" />
+            <ResultCard result={result} onRestart={oneMoreRound} actions={
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button onClick={oneMoreRound} data-testid="one-more-round"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#EAB308] text-[#0A0A0A] font-bold hover:bg-[#FACC15] transition-colors">
+                  🔥 One More Round
+                </button>
+                <button onClick={goodForToday} data-testid="good-for-today"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/15 text-[#E5E5E5] font-semibold hover:border-white/40 hover:bg-white/5 transition-colors">
+                  😌 I'm Good for Today
+                </button>
+              </div>
+            } />
           ) : (
             <>
               <p className="text-[#525252] text-xs font-mono-type uppercase tracking-widest mb-4">Type the answer</p>
-              <TypeOverEngine key={answer} text={answer} onComplete={onComplete} />
+              <TypeOverEngine key={`${answer}-${round}`} text={answer} onComplete={onComplete} />
             </>
           )}
         </div>

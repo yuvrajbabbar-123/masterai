@@ -1,11 +1,59 @@
 import os
 import json
 import re
+import asyncio
 import httpx
 
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 MODEL_NAME = "gemini-3-flash-preview"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
+
+
+class AIError(Exception):
+    """Sanitised AI error carrying a user-safe message + HTTP status."""
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
+async def _post_gemini(payload: dict) -> dict:
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=50) as client:
+                r = await client.post(GEMINI_URL, headers={"x-goog-api-key": GEMINI_API_KEY}, json=payload)
+            r.raise_for_status()
+            return r.json()
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            if code == 429:
+                if attempt < 1:
+                    await asyncio.sleep(2)
+                    continue
+                raise AIError(429, "The AI is rate-limited right now (usage quota reached). Please wait a moment and try again.")
+            if code in (500, 502, 503, 504):
+                if attempt < 2:
+                    await asyncio.sleep(1.5 * (attempt + 1))
+                    continue
+                raise AIError(503, "The AI service is temporarily unavailable. Please try again shortly.")
+            raise AIError(502, "The AI request could not be completed right now. Please try again later.")
+        except httpx.RequestError:
+            if attempt < 2:
+                await asyncio.sleep(1)
+                continue
+            raise AIError(503, "Could not reach the AI service. Please check your connection and try again.")
+    raise AIError(503, "The AI service is unavailable. Please try again.")
+
+
+def _text_from(data: dict) -> str:
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+        text = "".join(p.get("text", "") for p in parts)
+    except Exception:
+        text = ""
+    if not text.strip():
+        raise AIError(502, "The AI returned an empty response. Please rephrase and try again.")
+    return text
 
 LEVEL_GUIDE = {
     "Beginner": "very simple language, short sentences (~12-18 words each), everyday vocabulary.",
@@ -23,16 +71,8 @@ async def _generate(system: str, prompt: str, json_mode: bool = False) -> str:
     }
     if json_mode:
         payload["generationConfig"]["responseMimeType"] = "application/json"
-    async with httpx.AsyncClient(timeout=50) as client:
-        r = await client.post(
-            GEMINI_URL,
-            headers={"x-goog-api-key": GEMINI_API_KEY},
-            json=payload,
-        )
-    r.raise_for_status()
-    data = r.json()
-    parts = data["candidates"][0]["content"]["parts"]
-    return "".join(p.get("text", "") for p in parts)
+    data = await _post_gemini(payload)
+    return _text_from(data)
 
 
 def _extract_json(text: str):
@@ -52,13 +92,67 @@ async def _ask_json(system: str, prompt: str, session_id: str = None):
     return _extract_json(resp)
 
 
-async def generate_course(topic: str, level: str):
+async def _generate_multimodal(system: str, prompt: str, image_b64: str, mime: str) -> str:
+    payload = {
+        "system_instruction": {"parts": [{"text": system}]},
+        "contents": [{"parts": [
+            {"inline_data": {"mime_type": mime, "data": image_b64}},
+            {"text": prompt},
+        ]}],
+        "generationConfig": {"temperature": 0.2},
+    }
+    data = await _post_gemini(payload)
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+        return "".join(p.get("text", "") for p in parts)
+    except Exception:
+        return ""
+
+
+async def ocr_image(content: bytes, mime: str) -> str:
+    import base64
+    b64 = base64.b64encode(content).decode()
+    system = "You are a precise OCR and text-extraction engine."
+    prompt = (
+        "Extract ALL readable text from this image exactly as written, preserving the natural reading order. "
+        "It may be a photo of notes, a textbook page, a slide, a whiteboard or handwriting. "
+        "Return ONLY the transcribed plain text with no commentary. If there is no text, return an empty string."
+    )
+    return await _generate_multimodal(system, prompt, b64, mime)
+
+
+async def word_details(word: str):
+    system = (
+        "You are MasterAI vocabulary coach. Output ONLY valid JSON, no markdown. "
+        "Provide accurate details for the given English word."
+    )
+    prompt = f"""Give details for the word "{word}".
+Return JSON with EXACTLY this shape:
+{{
+  "word": "{word}",
+  "part_of_speech": "noun/verb/adjective/...",
+  "meaning": "clear one-sentence definition",
+  "examples": ["example sentence 1", "example sentence 2", "example sentence 3"]
+}}
+Each example is a natural sentence using the word. If it is not a standard English word, provide the closest correct interpretation. Plain text only, no markdown."""
+    return await _ask_json(system, prompt)
+
+
+async def generate_course(topic: str, level: str, known_concepts=None):
     guide = LEVEL_GUIDE.get(level, LEVEL_GUIDE["Beginner"])
     system = (
         "You are MasterAI, an expert curriculum designer. You output ONLY valid JSON, no prose, no markdown. "
         f"Write all learning content at this level: {guide}"
     )
-    prompt = f"""Create a focused micro-course to learn: "{topic}".
+    extra = ""
+    if known_concepts:
+        joined = ", ".join([c for c in known_concepts if c][:40])
+        extra = (
+            f" The learner has ALREADY mastered these concepts: {joined}. "
+            "Create the NEXT course that goes DEEPER and introduces NEW concepts building on those, "
+            "without repeating any concept already listed."
+        )
+    prompt = f"""Create a focused micro-course to learn: "{topic}".{extra}
 
 Return JSON with EXACTLY this shape:
 {{

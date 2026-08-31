@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TypeOverEngine } from "@/components/TypeOverEngine";
 import { ResultCard } from "@/pages/TypingPractice";
@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
  * Shared type-over lesson stepper used by Learn from Scratch and Learn from Documents.
  * props: title, subject, steps [{ group, lesson, concept, text }], backTo, backLabel, mode
  */
-export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back", mode = "learn" }) {
+export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back", mode = "learn", onLearnMore, learnMoreLoading }) {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
   const [step, setStep] = useState(0);
@@ -20,6 +20,22 @@ export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back"
   const total = steps.length;
   const done = step >= total;
   const current = steps[step];
+
+  const restart = () => { setResult(null); setStep(0); };
+
+  // Spacebar on the completion screen → keep learning (or restart)
+  useEffect(() => {
+    if (!done) return;
+    const h = (e) => {
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        if (onLearnMore && !learnMoreLoading) onLearnMore();
+        else restart();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [done, onLearnMore, learnMoreLoading]);
 
   const onComplete = async (stats) => {
     setResult(stats);
@@ -30,7 +46,6 @@ export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back"
   };
 
   const next = () => { setResult(null); setStep((s) => s + 1); };
-  const restart = () => { setResult(null); setStep(0); };
 
   return (
     <div className="min-h-[70vh] flex flex-col" data-testid="lesson-runner">
@@ -59,10 +74,21 @@ export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back"
             <Confetti size={56} weight="duotone" className="text-[#EAB308] mx-auto" />
             <h2 className="font-display text-3xl font-black mt-4">Complete!</h2>
             <p className="text-[#A3A3A3] mt-2">You typed every passage in "{title}" into memory.</p>
-            <div className="flex gap-3 justify-center mt-8">
-              <button onClick={restart} className="px-6 py-3 rounded-full border border-white/10 hover:border-white/30 transition-colors font-semibold">Restart</button>
-              <button onClick={() => navigate("/app/test")} className="px-6 py-3 rounded-full bg-[#EAB308] text-[#0A0A0A] font-bold hover:bg-[#FACC15] transition-colors">Test yourself</button>
+            <div className="flex flex-wrap gap-3 justify-center mt-8">
+              <button onClick={restart} data-testid="runner-restart"
+                className="px-6 py-3 rounded-full border border-white/10 hover:border-white/30 transition-colors font-semibold">Restart</button>
+              {onLearnMore && (
+                <button onClick={onLearnMore} disabled={learnMoreLoading} data-testid="learn-more-button"
+                  className="px-6 py-3 rounded-full bg-[#EAB308] text-[#0A0A0A] font-bold hover:bg-[#FACC15] transition-colors disabled:opacity-60">
+                  {learnMoreLoading ? "Building next level…" : "Learn More →"}
+                </button>
+              )}
+              <button onClick={() => navigate("/app/test")} data-testid="test-yourself-button"
+                className={`px-6 py-3 rounded-full font-bold transition-colors ${onLearnMore ? "border border-white/10 hover:border-white/30 text-white" : "bg-[#EAB308] text-[#0A0A0A] hover:bg-[#FACC15]"}`}>Test yourself</button>
             </div>
+            <p className="text-xs text-[#525252] mt-5 font-mono-type">
+              press <kbd className="px-1.5 py-0.5 rounded bg-[#171717] border border-white/10">space</kbd> to {onLearnMore ? "keep learning" : "restart"}
+            </p>
           </div>
         ) : result ? (
           <div>

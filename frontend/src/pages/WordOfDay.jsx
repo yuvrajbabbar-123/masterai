@@ -4,8 +4,9 @@ import { toast } from "sonner";
 import { TypeOverEngine } from "@/components/TypeOverEngine";
 import { useAuth } from "@/context/AuthContext";
 import { recordAttempt } from "@/lib/attempts";
-import { Sparkle, ArrowRight, CheckCircle, PencilSimple } from "@phosphor-icons/react";
+import { Sparkle, ArrowRight, CheckCircle, PencilSimple, MagnifyingGlass } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function WordOfDay() {
@@ -19,6 +20,18 @@ export default function WordOfDay() {
   const [attempts, setAttempts] = useState(0);
   const [grade, setGrade] = useState(null);
   const [grading, setGrading] = useState(false);
+  const [lookupWord, setLookupWord] = useState("");
+  const [looking, setLooking] = useState(false);
+
+  const resetForNewWord = (newData) => {
+    setData(newData);
+    setPhase("intro");
+    setExIdx(0);
+    setExDone(false);
+    setSentence("");
+    setAttempts(0);
+    setGrade(null);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -27,6 +40,34 @@ export default function WordOfDay() {
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+
+  // Spacebar advances to the next example once the current one is typed
+  useEffect(() => {
+    if (phase !== "examples" || !exDone) return;
+    const h = (e) => {
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        setExDone(false);
+        if (data && exIdx + 1 < data.examples.length) setExIdx((i) => i + 1);
+        else setPhase("write");
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [phase, exDone, exIdx, data]);
+
+  const doLookup = async () => {
+    const w = lookupWord.trim();
+    if (!w) return;
+    setLooking(true);
+    try {
+      const res = await api.post("/ai/word-lookup", { word: w });
+      resetForNewWord(res.data);
+      setLookupWord("");
+      toast.success(`Loaded "${res.data.word}"`);
+    } catch (err) { toast.error(err.response?.data?.detail || "Lookup failed"); }
+    finally { setLooking(false); }
+  };
 
   if (loading) return <div className="text-[#525252] font-mono-type animate-pulse">summoning today's word…</div>;
   if (!data) return <div className="text-[#A3A3A3]">Could not load. <button onClick={load} className="text-[#EAB308] underline">Retry</button></div>;
@@ -61,6 +102,20 @@ export default function WordOfDay() {
         <Sparkle size={34} weight="duotone" className="text-[#EAB308]" /> Word of the Day
       </h1>
 
+      {/* Own-word lookup */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+        <div className="relative flex-1">
+          <MagnifyingGlass size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#525252]" />
+          <Input data-testid="lookup-word-input" placeholder="Have a word in mind? Look it up…" value={lookupWord}
+            onChange={(e) => setLookupWord(e.target.value)} onKeyDown={(e) => e.key === "Enter" && doLookup()}
+            className="bg-[#0A0A0A] border-white/10 h-11 pl-10" />
+        </div>
+        <Button onClick={doLookup} disabled={looking || !lookupWord.trim()} data-testid="lookup-word-button"
+          className="h-11 px-6 bg-white/10 hover:bg-white/20 text-white font-semibold shrink-0">
+          {looking ? "Looking…" : "Look up"}
+        </Button>
+      </div>
+
       {/* Word card */}
       <div className="rounded-2xl border border-white/10 bg-[#171717] p-8">
         <div className="flex items-baseline gap-3 flex-wrap">
@@ -83,10 +138,17 @@ export default function WordOfDay() {
             Example {exIdx + 1} of {data.examples.length} — type it exactly
           </p>
           <TypeOverEngine key={exIdx} text={data.examples[exIdx]} onComplete={() => setExDone(true)} />
-          <Button onClick={nextExample} disabled={!exDone} data-testid="next-example-button"
-            className="mt-8 bg-[#EAB308] text-[#0A0A0A] font-bold hover:bg-[#FACC15] disabled:opacity-40 h-11 px-6">
-            {exIdx + 1 < data.examples.length ? "Next example" : "Write your own"} <ArrowRight className="ml-1" weight="bold" />
-          </Button>
+          <div className="flex items-center gap-3 mt-8">
+            <Button onClick={nextExample} disabled={!exDone} data-testid="next-example-button"
+              className="bg-[#EAB308] text-[#0A0A0A] font-bold hover:bg-[#FACC15] disabled:opacity-40 h-11 px-6">
+              {exIdx + 1 < data.examples.length ? "Next example" : "Write your own"} <ArrowRight className="ml-1" weight="bold" />
+            </Button>
+            {exDone && (
+              <span className="text-xs text-[#525252] font-mono-type">
+                or press <kbd className="px-1.5 py-0.5 rounded bg-[#171717] border border-white/10">space</kbd>
+              </span>
+            )}
+          </div>
         </div>
       )}
 

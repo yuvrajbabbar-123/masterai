@@ -78,19 +78,35 @@ function TabBtn({ active, onClick, icon: Icon, label, testid }) {
   );
 }
 
-export function ResultCard({ result, onRestart, label = "next" }) {
+export function ResultCard({ result, onRestart, label = "next", actions }) {
+  useEffect(() => {
+    const h = (e) => {
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        onRestart && onRestart();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onRestart]);
+
   return (
     <div className="fade-up text-center" data-testid="result-card">
       <p className="font-mono-type text-[#525252] uppercase tracking-widest text-sm">Complete</p>
-      <div className="flex items-center justify-center gap-12 my-8">
+      <div className="flex items-center justify-center gap-8 sm:gap-12 my-8">
         <Metric value={result.wpm} label="wpm" big />
         <Metric value={`${result.accuracy}%`} label="accuracy" />
         <Metric value={`${result.seconds}s`} label="time" />
       </div>
-      <button onClick={onRestart} data-testid="restart-button"
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#EAB308] text-[#0A0A0A] font-bold hover:bg-[#FACC15] transition-colors">
-        <ArrowClockwise size={18} weight="bold" /> {label}
-      </button>
+      {actions ? actions : (
+        <button onClick={onRestart} data-testid="restart-button"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#EAB308] text-[#0A0A0A] font-bold hover:bg-[#FACC15] transition-colors">
+          <ArrowClockwise size={18} weight="bold" /> {label}
+        </button>
+      )}
+      <p className="text-xs text-[#525252] mt-5 font-mono-type">
+        press <kbd className="px-1.5 py-0.5 rounded bg-[#171717] border border-white/10">space</kbd> to continue
+      </p>
     </div>
   );
 }
