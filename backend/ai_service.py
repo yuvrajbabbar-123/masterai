@@ -5,7 +5,7 @@ import asyncio
 import httpx
 
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-MODEL_NAME = "gemini-3-flash-preview"
+MODEL_NAME = "gemini-3.6-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
 
 
