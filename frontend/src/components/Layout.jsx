@@ -3,20 +3,22 @@ import { NavLink, useNavigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
   Keyboard, House, GraduationCap, ChatCircleDots, Exam, Sparkle,
   Trophy, UserCircle, CreditCard, SignOut, Flame, Lightning, FileText, List,
 } from "@phosphor-icons/react";
 
 const NAV = [
   { to: "/app/ask", label: "Ask AI", icon: ChatCircleDots },
-  { to: "/app", label: "Dashboard", icon: House, end: true },
   { to: "/app/typing", label: "Typing Practice", icon: Keyboard },
   { to: "/app/learn", label: "Learn from Scratch", icon: GraduationCap },
   { to: "/app/documents", label: "Learn from Documents", icon: FileText },
   { to: "/app/test", label: "Test Yourself", icon: Exam },
   { to: "/app/word", label: "Word of the Day", icon: Sparkle },
   { to: "/app/leaderboard", label: "Leaderboard", icon: Trophy },
-  { to: "/app/profile", label: "Profile", icon: UserCircle },
+  { to: "/app", label: "Dashboard", icon: House, end: true },
 ];
 
 function NavContents({ onNavigate, doLogout }) {
@@ -119,10 +121,32 @@ export default function Layout() {
               <Lightning weight="fill" className="text-[#EAB308]" size={18} />
               <span className="font-semibold tabular-nums">{user?.xp || 0}</span>
             </div>
-            <div className="w-9 h-9 rounded-full bg-[#262626] border border-white/10 flex items-center justify-center overflow-hidden">
-              {user?.picture ? <img src={user.picture} alt="" className="w-full h-full object-cover" /> :
-                <span className="font-display font-bold text-sm">{user?.name?.[0]?.toUpperCase() || "?"}</span>}
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button data-testid="profile-menu-button"
+                  className="w-9 h-9 rounded-full bg-[#262626] border border-white/10 flex items-center justify-center overflow-hidden hover:border-[#EAB308]/60 transition-colors">
+                  {user?.picture ? <img src={user.picture} alt="" className="w-full h-full object-cover" /> :
+                    <span className="font-display font-bold text-sm">{user?.name?.[0]?.toUpperCase() || "?"}</span>}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-[#171717] border-white/10">
+                <DropdownMenuLabel className="truncate">{user?.name}</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={() => navigate("/app/profile")} data-testid="menu-profile"
+                  className="cursor-pointer focus:bg-white/5">
+                  <UserCircle size={18} weight="bold" className="mr-2" /> Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/app/subscription")} data-testid="menu-upgrade"
+                  className="cursor-pointer focus:bg-white/5 text-[#EAB308]">
+                  <CreditCard size={18} weight="bold" className="mr-2" /> Upgrade to Pro
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={doLogout} data-testid="menu-logout"
+                  className="cursor-pointer focus:bg-white/5">
+                  <SignOut size={18} weight="bold" className="mr-2" /> Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
