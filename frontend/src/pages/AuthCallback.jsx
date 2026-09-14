@@ -22,8 +22,8 @@ export default function AuthCallback() {
       try {
         const res = await api.post("/auth/google/session", { session_id: sessionId });
         applyAuth(res.data);
-        window.history.replaceState(null, "", "/app/typing");
-        navigate("/app/typing", { state: { user: res.data.user } });
+        window.history.replaceState(null, "", "/app/ask");
+        navigate("/app/ask", { state: { user: res.data.user } });
       } catch {
         navigate("/login");
       }

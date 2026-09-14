@@ -15,7 +15,7 @@ from models import (
     RegisterRequest, LoginRequest, GoogleSessionRequest, User,
     CourseRequest, AskRequest, QuizRequest, GradeShortRequest,
     GradeSentenceRequest, AttemptRequest, LevelUpdate, WordLookupRequest,
-    now_utc, new_id,
+    ChatRequest, now_utc, new_id,
 )
 from auth import hash_password, verify_password, create_jwt, make_authenticator
 import ai_service
@@ -35,8 +35,8 @@ logger = logging.getLogger(__name__)
 get_current_user = make_authenticator(db)
 
 # ---------- Fair usage / plan config ----------
-FREE_MONTHLY_LIMITS = {"course": 3, "ask": 10, "quiz": 50, "document": 2, "word": 31}
-PRO_MONTHLY_LIMITS = {"course": 100, "ask": 2000, "quiz": 9999, "document": 100, "word": 31}
+FREE_MONTHLY_LIMITS = {"course": 3, "ask": 200, "quiz": 50, "document": 2, "word": 31}
+PRO_MONTHLY_LIMITS = {"course": 100, "ask": 5000, "quiz": 9999, "document": 100, "word": 31}
 
 BADGE_RULES = [
     ("first_steps", "First Steps", 50),
@@ -183,11 +183,30 @@ async def ai_course(body: CourseRequest, current=Depends(get_current_user)):
     course = {
         "course_id": new_id("course"), "user_id": current["user_id"],
         "topic": body.topic, "level": level, "created_at": now_utc().isoformat(),
+        "stage": body.stage or 1, "journey_id": body.journey_id or new_id("journey"),
+        "completed": False,
         **data,
     }
     await db.courses.insert_one(dict(course))
     course.pop("_id", None)
     return course
+
+
+@api_router.delete("/courses/{course_id}")
+async def delete_course(course_id: str, current=Depends(get_current_user)):
+    res = await db.courses.delete_one({"course_id": course_id, "user_id": current["user_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return {"ok": True}
+
+
+@api_router.post("/courses/{course_id}/complete")
+async def complete_course(course_id: str, current=Depends(get_current_user)):
+    await db.courses.update_one(
+        {"course_id": course_id, "user_id": current["user_id"]},
+        {"$set": {"completed": True, "completed_at": now_utc().isoformat()}},
+    )
+    return {"ok": True}
 
 
 @api_router.get("/courses")
@@ -276,6 +295,67 @@ async def ai_ask(body: AskRequest, current=Depends(get_current_user)):
         raise _ai_http_error(e)
     await consume(current, "ask")
     return {"question": body.question, "answer": answer}
+
+
+# ================= CHAT (ChatGPT-style tool) =================
+@api_router.post("/chat")
+async def chat(body: ChatRequest, current=Depends(get_current_user)):
+    msg = (body.message or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+    await check_limit(current, "ask")
+
+    uid = current["user_id"]
+    thread = None
+    if body.thread_id:
+        thread = await db.chat_threads.find_one({"thread_id": body.thread_id, "user_id": uid}, {"_id": 0})
+    if not thread:
+        thread = {
+            "thread_id": new_id("thread"), "user_id": uid,
+            "title": msg[:60], "messages": [],
+            "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
+        }
+
+    history = thread["messages"] + [{"role": "user", "content": msg}]
+    try:
+        reply = await ai_service.chat_reply(history[-20:])
+    except Exception as e:
+        raise _ai_http_error(e)
+    await consume(current, "ask")
+
+    now = now_utc().isoformat()
+    thread["messages"] = history + [{"role": "assistant", "content": reply, "at": now}]
+    thread["messages"][-2]["at"] = now
+    thread["updated_at"] = now
+    await db.chat_threads.update_one(
+        {"thread_id": thread["thread_id"], "user_id": uid},
+        {"$set": thread}, upsert=True,
+    )
+    return {"thread_id": thread["thread_id"], "title": thread["title"], "reply": reply}
+
+
+@api_router.get("/chat/threads")
+async def list_threads(current=Depends(get_current_user)):
+    docs = await db.chat_threads.find(
+        {"user_id": current["user_id"]}, {"_id": 0, "messages": 0}
+    ).sort("updated_at", -1).to_list(100)
+    return docs
+
+
+@api_router.get("/chat/threads/{thread_id}")
+async def get_thread(thread_id: str, current=Depends(get_current_user)):
+    doc = await db.chat_threads.find_one({"thread_id": thread_id, "user_id": current["user_id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return doc
+
+
+@api_router.delete("/chat/threads/{thread_id}")
+async def delete_thread(thread_id: str, current=Depends(get_current_user)):
+    res = await db.chat_threads.delete_one({"thread_id": thread_id, "user_id": current["user_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"ok": True}
 
 
 @api_router.post("/ai/quiz")

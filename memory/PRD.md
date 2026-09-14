@@ -54,8 +54,13 @@ Shared Type-Over engine: display exact source text greyed out → capture keystr
 - LLM: user's OWN Google Gemini key (gemini-3-flash-preview) via direct REST, key sent as x-goog-api-key header (not logged). NOTE: free-tier Gemini keys cap ~20 requests/day.
 - DB: user's MongoDB Atlas cluster masterai.un9wvnh.mongodb.net (migrated from local; DB_NAME=test_database).
 
+## Build 5 (2026-08) — Chat tool + course stages + default landing
+- Ask AI rebuilt as a ChatGPT-style tool: multi-turn context, Markdown-rendered replies, per-message copy, New chat + History (threads persisted in db.chat_threads). Endpoints: POST /chat, GET /chat/threads, GET/DELETE /chat/threads/{id}; ai_service.chat_reply. Free "ask" limit raised to 200/mo.
+- Ask AI is now the FIRST nav item and the default landing route ("/", "*", login, AuthCallback, manifest start_url all -> /app/ask).
+- Learn from Scratch "Your Courses": stage badge (Stage N; Master crown at stage>=10), delete (AlertDialog confirm; DELETE /courses/{id}), Continue/Redo + Next stage (generates next deeper course in same journey via stage+journey_id). Courses marked completed on finish (POST /courses/{id}/complete); LessonRunner onFinished.
+
 ## Test Status
-Backend: iteration_8 7/7 pytest pass. Frontend: iterations 1-8 all core flows pass; infinity-loop stale-state bug fixed with key remount (deterministic).
+Backend: iteration_9 9/9 pytest pass. Frontend: iterations 1-9 all requested flows pass. Model: gemini-3.6-flash (stable). Note: free-tier Gemini daily quota still applies; app degrades gracefully with sanitised errors + no credit burn.
 
 ## Build 3 (2026-06) — Mobile + PWA
 - Full mobile responsiveness: hamburger drawer nav (Sheet) on <md, responsive typography/spacing, stacked input rows, no horizontal overflow at 390px.

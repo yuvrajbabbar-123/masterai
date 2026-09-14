@@ -92,6 +92,28 @@ async def _ask_json(system: str, prompt: str, session_id: str = None):
     return _extract_json(resp)
 
 
+CHAT_SYSTEM = (
+    "You are MasterAI, a helpful, knowledgeable and friendly AI assistant. "
+    "Answer the user's questions clearly, accurately and conversationally. "
+    "You may use Markdown (headings, bold, bullet points, numbered lists, and fenced code blocks) "
+    "to format your answers well. Keep answers focused and useful."
+)
+
+
+async def chat_reply(messages: list) -> str:
+    contents = []
+    for m in messages:
+        role = "model" if m.get("role") == "assistant" else "user"
+        contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+    payload = {
+        "system_instruction": {"parts": [{"text": CHAT_SYSTEM}]},
+        "contents": contents,
+        "generationConfig": {"temperature": 0.7},
+    }
+    data = await _post_gemini(payload)
+    return _text_from(data)
+
+
 async def _generate_multimodal(system: str, prompt: str, image_b64: str, mime: str) -> str:
     payload = {
         "system_instruction": {"parts": [{"text": system}]},

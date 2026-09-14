@@ -47,7 +47,7 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<Navigate to="/app/typing" replace />} />
+      <Route path="/" element={<Navigate to="/app/ask" replace />} />
       <Route path="/app" element={<Protected><Layout /></Protected>}>
         <Route index element={<Dashboard />} />
         <Route path="typing" element={<TypingPractice />} />
@@ -62,7 +62,7 @@ function AppRouter() {
         <Route path="leaderboard" element={<Leaderboard />} />
         <Route path="subscription" element={<Subscription />} />
       </Route>
-      <Route path="*" element={<Navigate to="/app/typing" replace />} />
+      <Route path="*" element={<Navigate to="/app/ask" replace />} />
     </Routes>
   );
 }

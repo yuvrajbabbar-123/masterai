@@ -51,6 +51,13 @@ class CourseRequest(BaseModel):
     topic: str
     level: Optional[str] = None
     known_concepts: Optional[List[str]] = None
+    stage: Optional[int] = None
+    journey_id: Optional[str] = None
+
+
+class ChatRequest(BaseModel):
+    thread_id: Optional[str] = None
+    message: str
 
 
 class WordLookupRequest(BaseModel):

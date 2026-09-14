@@ -27,7 +27,7 @@ export default function Login() {
         if (!form.age) { toast.error("Please confirm you are 13 or older."); setBusy(false); return; }
         await register({ name: form.name, email: form.email, password: form.password, age_confirmed: form.age });
       }
-      navigate("/app/typing");
+      navigate("/app/ask");
     } catch (err) {
       toast.error(err.response?.data?.detail || "Something went wrong");
     } finally {
@@ -37,7 +37,7 @@ export default function Login() {
 
   const googleLogin = () => {
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + "/app/typing";
+    const redirectUrl = window.location.origin + "/app/ask";
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 

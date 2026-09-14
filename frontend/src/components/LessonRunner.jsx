@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { TypeOverEngine } from "@/components/TypeOverEngine";
 import { ResultCard } from "@/pages/TypingPractice";
@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
  * Shared type-over lesson stepper used by Learn from Scratch and Learn from Documents.
  * props: title, subject, steps [{ group, lesson, concept, text }], backTo, backLabel, mode
  */
-export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back", mode = "learn", onLearnMore, learnMoreLoading }) {
+export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back", mode = "learn", onLearnMore, learnMoreLoading, onFinished }) {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
   const [step, setStep] = useState(0);
@@ -22,6 +22,16 @@ export function LessonRunner({ title, subject, steps, backTo, backLabel = "Back"
   const current = steps[step];
 
   const restart = () => { setResult(null); setStep(0); };
+
+  // Notify parent once when the whole set is finished (e.g. to mark a course complete)
+  const finishedRef = useRef(false);
+  useEffect(() => {
+    if (done && !finishedRef.current) {
+      finishedRef.current = true;
+      onFinished && onFinished();
+    }
+    if (!done) finishedRef.current = false;
+  }, [done, onFinished]);
 
   // Spacebar on the completion screen → keep learning (or restart)
   useEffect(() => {

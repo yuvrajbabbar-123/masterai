@@ -20,27 +20,35 @@ export default function CourseView() {
     const known = (course.modules || []).flatMap((m) => (m.lessons || []).map((l) => l.concept)).filter(Boolean);
     setLoadingMore(true);
     try {
-      const res = await api.post("/ai/course", { topic: course.topic || course.title, known_concepts: known });
-      toast.success("Next level ready — keep going!");
+      const res = await api.post("/ai/course", {
+        topic: course.topic || course.title,
+        known_concepts: known,
+        journey_id: course.journey_id,
+        stage: (course.stage || 1) + 1,
+      });
+      toast.success(`Stage ${(course.stage || 1) + 1} ready — keep going!`);
       navigate(`/app/learn/${res.data.course_id}`);
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Could not build the next course");
+      toast.error(err.response?.data?.detail || "Could not build the next stage");
     } finally {
       setLoadingMore(false);
     }
   };
 
+  const markComplete = () => { api.post(`/courses/${course.course_id}/complete`).catch(() => {}); };
+
   return (
     <LessonRunner
       key={course.course_id}
       title={course.title}
-      subject={course.subject || course.topic}
+      subject={`Stage ${course.stage || 1} · ${course.subject || course.topic}`}
       steps={courseToSteps(course)}
       backTo="/app/learn"
       backLabel="Courses"
       mode="learn"
       onLearnMore={learnMore}
       learnMoreLoading={loadingMore}
+      onFinished={markComplete}
     />
   );
 }
