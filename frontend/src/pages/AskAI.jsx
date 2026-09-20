@@ -38,22 +38,13 @@ function CopyButton({ text }) {
 
 function AssistantMessage({ content }) {
   const [practicing, setPracticing] = useState(false);
-  const [done, setDone] = useState(false);
 
   return (
     <div className="group max-w-[85%]" data-testid="assistant-answer">
       <div className="rounded-2xl px-4 py-3 bg-[#171717] border border-white/10">
         {practicing ? (
           <div data-testid="answer-practice">
-            <TypeOverEngine
-              text={content}
-              onComplete={() => setDone(true)}
-            />
-            {done && (
-              <div className="mt-3 text-2xl" data-testid="practice-complete-emoji" aria-label="completed">
-                🎉
-              </div>
-            )}
+            <TypeOverEngine text={content} />
           </div>
         ) : (
           // greyed-out answer
@@ -64,13 +55,13 @@ function AssistantMessage({ content }) {
       </div>
       <div className="mt-1.5 flex items-center gap-3">
         {!practicing ? (
-          <button onClick={() => { setPracticing(true); setDone(false); }}
+          <button onClick={() => setPracticing(true)}
             data-testid="practice-answer-button"
             className="flex items-center gap-1 text-xs text-[#525252] hover:text-[#EAB308] transition-colors p-1 rounded">
             <Keyboard size={15} /> Practice
           </button>
         ) : (
-          <button onClick={() => { setPracticing(false); setDone(false); }}
+          <button onClick={() => setPracticing(false)}
             data-testid="stop-practice-button"
             className="flex items-center gap-1 text-xs text-[#525252] hover:text-white transition-colors p-1 rounded">
             <X size={15} /> Close

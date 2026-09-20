@@ -92,7 +92,6 @@ export function ResultCard({ result, onRestart, label = "next", actions }) {
 
   return (
     <div className="fade-up text-center" data-testid="result-card">
-      <div className="text-3xl mb-1" data-testid="completion-emoji" aria-label="great job">🎉</div>
       <p className="font-mono-type text-[#525252] uppercase tracking-widest text-sm">Complete</p>
       <div className="flex items-center justify-center gap-8 sm:gap-12 my-8">
         <Metric value={result.wpm} label="wpm" big />
