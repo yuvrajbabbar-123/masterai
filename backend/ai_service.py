@@ -93,10 +93,12 @@ async def _ask_json(system: str, prompt: str, session_id: str = None):
 
 
 CHAT_SYSTEM = (
-    "You are MasterAI, a helpful, knowledgeable and friendly AI assistant. "
-    "Answer the user's questions clearly, accurately and conversationally. "
-    "You may use Markdown (headings, bold, bullet points, numbered lists, and fenced code blocks) "
-    "to format your answers well. Keep answers focused and useful."
+    "You are MasterAI, a friendly AI assistant. "
+    "Answer in simple, plain, everyday English that anyone can understand. "
+    "Keep answers short and to the point (usually 2-4 sentences). "
+    "Explain things simply and avoid unnecessary detail. "
+    "Do NOT use markdown, headings, bullet points, numbered lists or code fences. "
+    "Reply as plain prose with normal punctuation only."
 )
 
 
@@ -111,7 +113,11 @@ async def chat_reply(messages: list) -> str:
         "generationConfig": {"temperature": 0.7},
     }
     data = await _post_gemini(payload)
-    return _text_from(data)
+    text = _text_from(data)
+    # keep answers plain & typeable
+    text = text.replace("*", "").replace("#", "").replace("`", "")
+    text = re.sub(r"[ \t]+", " ", text).strip()
+    return text
 
 
 async def _generate_multimodal(system: str, prompt: str, image_b64: str, mime: str) -> str:

@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { TypeOverEngine } from "@/components/TypeOverEngine";
 import {
   PaperPlaneRight, Plus, ClockCounterClockwise, Copy, Check,
-  Trash, Sparkle, Robot,
+  Trash, Sparkle, Robot, Keyboard, X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,9 +30,55 @@ function CopyButton({ text }) {
   };
   return (
     <button onClick={copy} data-testid="copy-message-button"
-      className="text-[#525252] hover:text-white transition-colors p-1 rounded">
+      className="flex items-center gap-1 text-[#525252] hover:text-white transition-colors text-xs p-1 rounded">
       {copied ? <Check size={15} weight="bold" className="text-green-400" /> : <Copy size={15} />}
     </button>
+  );
+}
+
+function AssistantMessage({ content }) {
+  const [practicing, setPracticing] = useState(false);
+  const [done, setDone] = useState(false);
+
+  return (
+    <div className="group max-w-[85%]" data-testid="assistant-answer">
+      <div className="rounded-2xl px-4 py-3 bg-[#171717] border border-white/10">
+        {practicing ? (
+          <div data-testid="answer-practice">
+            <TypeOverEngine
+              text={content}
+              onComplete={() => setDone(true)}
+            />
+            {done && (
+              <div className="mt-3 text-2xl" data-testid="practice-complete-emoji" aria-label="completed">
+                🎉
+              </div>
+            )}
+          </div>
+        ) : (
+          // greyed-out answer
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-[#737373]" data-testid="answer-text">
+            {content}
+          </p>
+        )}
+      </div>
+      <div className="mt-1.5 flex items-center gap-3">
+        {!practicing ? (
+          <button onClick={() => { setPracticing(true); setDone(false); }}
+            data-testid="practice-answer-button"
+            className="flex items-center gap-1 text-xs text-[#525252] hover:text-[#EAB308] transition-colors p-1 rounded">
+            <Keyboard size={15} /> Practice
+          </button>
+        ) : (
+          <button onClick={() => { setPracticing(false); setDone(false); }}
+            data-testid="stop-practice-button"
+            className="flex items-center gap-1 text-xs text-[#525252] hover:text-white transition-colors p-1 rounded">
+            <X size={15} /> Close
+          </button>
+        )}
+        <CopyButton text={content} />
+      </div>
+    </div>
   );
 }
 
@@ -88,7 +133,7 @@ export default function AskAI() {
       loadThreads();
     } catch (err) {
       toast.error(err.response?.data?.detail || "AI failed to respond");
-      setMessages((m) => [...m, { role: "assistant", content: "_Sorry — I couldn't respond just now. Please try again._" }]);
+      setMessages((m) => [...m, { role: "assistant", content: "Sorry — I couldn't respond just now. Please try again." }]);
     } finally { setSending(false); }
   };
 
@@ -142,7 +187,7 @@ export default function AskAI() {
             </div>
             <div>
               <p className="font-display text-xl font-bold">How can I help you learn today?</p>
-              <p className="text-[#A3A3A3] text-sm mt-1">Ask anything — answers are yours to read and copy.</p>
+              <p className="text-[#A3A3A3] text-sm mt-1">Ask anything — read the answer, then hit Practice to type it out.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-2 w-full max-w-lg">
               {SUGGESTIONS.map((s) => (
@@ -163,24 +208,15 @@ export default function AskAI() {
                     <Sparkle size={16} weight="fill" className="text-[#0A0A0A]" />
                   </div>
                 )}
-                <div className={`group max-w-[85%] ${m.role === "user" ? "order-2" : ""}`}>
-                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    m.role === "user" ? "bg-[#EAB308] text-[#0A0A0A] font-medium" : "bg-[#171717] border border-white/10 text-[#E5E5E5]"
-                  }`}>
-                    {m.role === "assistant" ? (
-                      <div className="chat-md">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                      </div>
-                    ) : (
+                {m.role === "assistant" ? (
+                  <AssistantMessage content={m.content} />
+                ) : (
+                  <div className="max-w-[85%] order-2">
+                    <div className="rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[#EAB308] text-[#0A0A0A] font-medium">
                       <span className="whitespace-pre-wrap">{m.content}</span>
-                    )}
-                  </div>
-                  {m.role === "assistant" && (
-                    <div className="mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <CopyButton text={m.content} />
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             ))}
             {sending && (
