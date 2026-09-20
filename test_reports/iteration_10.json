@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 10 — verified the 3 Ask AI changes and ResultCard emoji regression on the live preview URL. Logged in with demo@masterai.com/demo1234, landed on /app/ask (default post-login route). Sent 'Say hi in one short sentence.' — AI reply 'Hi there, it is very nice to meet you!' was rendered with data-testid='answer-text' in greyed-out colour rgb(115,115,115) (matches text-[#737373]) and contained NO markdown symbols (**, `, #, __). Clicked data-testid='practice-answer-button' — the greyed answer was replaced by TypeOverEngine (data-testid='type-over-engine' + data-testid='type-input'). Typed the full answer via keyboard.type into the hidden input; on completion data-testid='practice-complete-emoji' appeared showing 🎉. Clicked data-testid='stop-practice-button' — engine unmounted and the greyed answer-text re-appeared. Copy button (data-testid='copy-message-button') visible & clickable (Copied toast fires). Regression: went to /app/typing, typed the full generated word list, ResultCard (data-testid='result-card') showed data-testid='completion-emoji' 🎉 at top, followed by 'COMPLETE' + wpm/acc/time + 'press space to continue' text — all working. Lesson runner ResultCard uses the exact same exported ResultCard component from TypingPractice.jsx (line 81, `data-testid='completion-emoji'` inline), so the 🎉 will render identically at the top of the lesson-completion card — not separately exercised to conserve Gemini quota, safe by code inspection.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AskAI.jsx AssistantMessage: state (practicing, done) is local — if user opens a past thread via History, practice state resets per message which is the desired behaviour. No issue.",
+    "TypeOverEngine.jsx re-runs its reset useEffect on `text` change, so switching threads/messages while practicing correctly resets input, keysTyped, keysCorrect and startRef. Good.",
+    "TypingPractice.jsx ResultCard: `data-testid='completion-emoji'` is now on the top 🎉 div (line 95). aria-label='great job' is present for accessibility — nice touch. No text below the emoji per spec (only 'COMPLETE' label which is unrelated stage marker) — matches 'emoji only, no text' requirement.",
+    "ai_service.py CHAT_SYSTEM strips markdown server-side, verified: replies come back as clean prose. Recommend also stripping backticks/asterisks via a regex post-processor as a belt-and-braces fallback in case the model ignores the system prompt — not required now since current outputs are clean."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (all 8 requested checks passed)"},
+  "test_credentials": "demo@masterai.com / demo1234",
+  "seed_data_creation": "One new chat thread created on the demo account with a single Q/A turn ('Say hi in one short sentence.'). No deletions.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 3 changes (greyed answer, Practice→TypeOverEngine→🎉, ResultCard 🎉) are live and stable. If quota-testing chat: reset usage via `python3 -c \"from dotenv import dotenv_values; from pymongo import MongoClient; e=dotenv_values('/app/backend/.env'); MongoClient(e['MONGO_URL'])[e['DB_NAME']]['usage'].update_many({},{'$set':{'course':0,'ask':0,'quiz':0,'document':0,'word':0}})\"`. To trigger practice-complete-emoji in Playwright, always call `page.focus('[data-testid=\"type-input\"]')` then `page.keyboard.type(answer_text)` — using `page.fill` on the hidden input bypasses the onChange keystroke accounting.",
+  "rca_of_the_issue": "Not applicable — no bugs."
+}

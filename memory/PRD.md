@@ -60,7 +60,15 @@ Shared Type-Over engine: display exact source text greyed out → capture keystr
 - Learn from Scratch "Your Courses": stage badge (Stage N; Master crown at stage>=10), delete (AlertDialog confirm; DELETE /courses/{id}), Continue/Redo + Next stage (generates next deeper course in same journey via stage+journey_id). Courses marked completed on finish (POST /courses/{id}/complete); LessonRunner onFinished.
 
 ## Test Status
-Backend: iteration_9 9/9 pytest pass. Frontend: iterations 1-9 all requested flows pass. Model: gemini-3.6-flash (stable). Note: free-tier Gemini daily quota still applies; app degrades gracefully with sanitised errors + no credit burn.
+Backend: iteration_9 9/9 pytest pass. Frontend: iterations 1-10 all requested flows pass. Model: gemini-3.6-flash (stable). Note: free-tier Gemini daily quota still applies; app degrades gracefully with sanitised errors + no credit burn.
+
+## Build 6 (2026-06) — Ask AI type-over practice + concise replies + completion emoji
+- Ask AI replies now render GREYED-OUT plain text (text-[#737373], data-testid='answer-text'); each answer has a small "Practice" button (data-testid='practice-answer-button') that swaps the answer into the monkeytype TypeOverEngine so the user can type over it; "Close" (stop-practice-button) returns to read mode. AssistantMessage component in AskAI.jsx.
+- On finishing a type-over practice, a small 🎉 emoji shows (data-testid='practice-complete-emoji'), emoji only.
+- Shared ResultCard (TypingPractice.jsx) now shows a small 🎉 at top (data-testid='completion-emoji') on every task completion (typing, lessons, quizzes).
+- Backend chat_reply/CHAT_SYSTEM (ai_service.py) rewritten to answer in simple, plain, concise everyday English (2-4 sentences), NO markdown; server strips * # ` for clean typeable text. Removed react-markdown from Ask AI rendering.
+- Verified: testing_agent iteration_10 100% (8/8 frontend checks pass, no bugs).
+
 
 ## Build 3 (2026-06) — Mobile + PWA
 - Full mobile responsiveness: hamburger drawer nav (Sheet) on <md, responsive typography/spacing, stacked input rows, no horizontal overflow at 390px.
