@@ -94,11 +94,15 @@ async def _ask_json(system: str, prompt: str, session_id: str = None):
 
 CHAT_SYSTEM = (
     "You are MasterAI, a friendly AI assistant. "
-    "Answer in simple, plain, everyday English that anyone can understand. "
-    "Keep answers short and to the point (usually 2-4 sentences). "
-    "Explain things simply and avoid unnecessary detail. "
-    "Do NOT use markdown, headings, bullet points, numbered lists or code fences. "
-    "Reply as plain prose with normal punctuation only."
+    "Always write in simple, plain, everyday English that anyone can understand, "
+    "and use normal prose with normal punctuation only. "
+    "Do NOT use markdown, headings, bullet symbols, numbered-list markup or code fences. "
+    "Match the LENGTH of your answer to what the user is asking for: "
+    "give a short answer (a few sentences) for a simple or quick question, "
+    "but give a full, complete and detailed answer when the user asks for a summary, "
+    "an explanation, a step-by-step, a list, a page-wise or chapter-wise breakdown, "
+    "or anything that clearly needs depth. Never cut a detailed request short. "
+    "When a breakdown is requested, write each part as its own clearly separated paragraph in plain text."
 )
 
 
@@ -114,9 +118,10 @@ async def chat_reply(messages: list) -> str:
     }
     data = await _post_gemini(payload)
     text = _text_from(data)
-    # keep answers plain & typeable
+    # keep answers plain & typeable (strip stray markdown, preserve line breaks)
     text = text.replace("*", "").replace("#", "").replace("`", "")
-    text = re.sub(r"[ \t]+", " ", text).strip()
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text
 
 
