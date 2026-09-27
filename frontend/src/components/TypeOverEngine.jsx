@@ -35,7 +35,10 @@ export function TypeOverEngine({ text, onComplete, onFirstKey, onProgress }) {
     firedFirst.current = false;
     setLiveWpm(0);
     // autofocus so typing (and mobile keyboard) starts immediately
-    const t = setTimeout(() => hiddenInputRef.current?.focus(), 60);
+    const t = setTimeout(() => {
+      hiddenInputRef.current?.focus({ preventScroll: true });
+      containerRef.current?.scrollIntoView({ block: "start" });
+    }, 60);
     return () => clearTimeout(t);
   }, [text]);
 
@@ -115,7 +118,7 @@ export function TypeOverEngine({ text, onComplete, onFirstKey, onProgress }) {
     return input[i] === ch ? "text-[#E5E5E5]" : "text-[#F43F5E] bg-[#F43F5E]/10 rounded-sm";
   };
 
-  const focusInput = () => hiddenInputRef.current?.focus();
+  const focusInput = () => hiddenInputRef.current?.focus({ preventScroll: true });
 
   return (
     <div data-testid="type-over-engine">
