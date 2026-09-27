@@ -99,6 +99,9 @@ export function TypeOverEngine({ text, onComplete, onFirstKey, onProgress }) {
         setCaret({ left: r.right - cont.left, top: r.top - cont.top, height: r.height });
       }
     }
+    // keep the line being typed comfortably in view
+    const active = target || charRefs.current[idx - 1];
+    if (active && input.length > 0) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [input, chars]);
 
   // group into words for natural wrapping
@@ -148,7 +151,7 @@ export function TypeOverEngine({ text, onComplete, onFirstKey, onProgress }) {
           spellCheck={false}
           inputMode="text"
           aria-label="Type the text shown"
-          className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20"
+          className="absolute top-0 left-0 w-px h-px opacity-0 z-20"
           style={{ caretColor: "transparent" }}
         />
 
