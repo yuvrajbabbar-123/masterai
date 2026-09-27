@@ -1,0 +1,24 @@
+{
+  "summary": "Retested TypeOverEngine caret follow-scroll and Maximum-update-depth React error after the iteration_13 refactor (guarded setCaret + separate rAF-based scroll-follow useEffect deps=[input] using getScrollParent). Seeded a 1821-char water-cycle assistant thread under demo user (Gemini not called). Logged in demo@masterai.com/demo1234, opened History -> seeded 'Caret test' thread -> Practice, focused [data-testid='type-input'] and typed 1000 chars on desktop 1920x800 and 600 chars on mobile 390x844 via page.keyboard.type, sampling span.type-caret every 50 chars. BOTH prior issues are FIXED.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/tests/seed_thread.py", "/app/tests/cleanup_thread.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix is effective: separating scroll-follow into its own useEffect(deps=[input]) inside requestAnimationFrame with getScrollParent + direct scrollTop mutation and NO setState avoids the render-loop that previously triggered 'Maximum update depth exceeded'. Guarding setCaret against no-op writes further ensures state stability.",
+    "Observation: after ~400-450 chars the caret band locks at ~44% on desktop and ~42% on mobile — this is because the scroller has reached bottom (all lines visible) so no further scroll is needed. Confirmed via samples where top stays constant while typed count keeps increasing. This is correct behavior, not a bug.",
+    "Consider adding useLayoutEffect for setCaret to eliminate any tearing between paint and scroll, but functionally the current rAF flow is behaving correctly."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "Caret-in-viewport PASS 2/2 (desktop 0/20 off-screen, mobile 0/12 off-screen); No React Max-update-depth (0 pageerrors, 0 console errors, no red overlay iframe) on both viewports; Character registration PASS (typed chars render white/red over grey source)."},
+  "test_credentials": "demo@masterai.com / demo1234",
+  "seed_data_creation": "Inserted 1 chat_threads doc (test-caret-4d70a291, 1821 chars) via /app/tests/seed_thread.py and cleaned up with /app/tests/cleanup_thread.py (deleted=1).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both bugs from iteration_13 are resolved. Desktop 1920x800 band range across 20 samples: 43.6%-56.8% (settles at 44.3% after buffer exhausts). Mobile 390x844 band across 12 samples: 40.5%-55.2%. 0 React errors, 0 'Maximum update depth' messages, no react-error-overlay iframe. If further changes are made, reuse /app/tests/seed_thread.py + this iteration's playwright flow (History dropdown -> [data-testid=thread-test-caret-*] -> [data-testid=practice-answer-button] -> focus [data-testid=type-input] -> keyboard.type with delay=6 -> sample span.type-caret rect.top vs window.innerHeight every 50 chars).",
+  "rca of the issue": "Root cause of both prior bugs (iter_13) was that caret positioning useEffect performed BOTH setCaret (state write) AND scroller.scrollTop mutation in the same effect keyed on [input, chars]. The state write re-triggered the effect which computed a stale rect (React had not yet painted the new caret), so the delta was near-zero for repeat corrections, and setState-inside-effect combined with parent re-renders exceeded React's update depth. The fix (a) guards setCaret to only fire when left/top/height genuinely change, and (b) moves scroll-follow into a SEPARATE useEffect(deps=[input]) that runs inside requestAnimationFrame after paint, reads a fresh getBoundingClientRect, and performs a pure DOM mutation (scroller.scrollTop += delta) with NO setState. This breaks the feedback loop and lets the correction fire on every keystroke."
+}
