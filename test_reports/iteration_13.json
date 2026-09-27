@@ -1,0 +1,42 @@
+{
+  "summary": "Retested caret-follow-scroll in TypeOverEngine on Ask AI Practice mode using the new getScrollParent + explicit delta-scroll implementation. Seeded an 1821-char water-cycle assistant message under demo user (Gemini rate-limited). Typed 1000 chars on desktop 1920x800 and 600 chars on mobile 390x844 via page.focus + page.keyboard.type. Character registration still works correctly (grey=0/200 in typed range). However the primary review-request expectation FAILS again on both viewports: the caret drifts BELOW the viewport bottom and never recovers. Additionally, a NEW critical regression appeared on desktop: a React 'Maximum update depth exceeded' runtime error overlay is thrown during practice typing (visible full-page overlay).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "TypeOverEngine caret follow-scroll (retest of iteration_12 fix)",
+        "issue": "The new getScrollParent + delta-scroll logic (lines 3-11 and 112-125 of TypeOverEngine.jsx) is NOT effective. Only ONE correction ever fires per session, then the caret keeps drifting down without further scroll adjustments. Desktop 1920x800: caret band goes 43.6% -> 61.6% (typed 50->250), single correction jumps back to 47.8% at 300 chars, then band walks up unimpeded: 52.3, 56.8, 61.3, 65.8, 70.3, 74.8, 79.3, 83.8, 88.3, 92.8, 97.3, 101.8, 106.3, 110.8% -- 3/20 samples off-screen (band>100%). Mobile 390x844 is worse: band walks 42.4 -> 55.2 -> 52.3 (one small correction) -> 65.1 -> 77.6 -> 86.5 -> 99.3 -> 112.1 -> 120.6 -> 133.4 -> 145.9 -> 154.7%. 5/12 samples off-screen. Post-typing inspection of the scroll parent on mobile shows: {tag:'DIV', class:'flex-1 overflow-y-auto ...', scrollTop:132, scrollHeight:3875, clientHeight:555, atMax:false}. So getScrollParent IS finding the correct scroller (the AskAI messages container) and it has ~3320px of headroom, but scrollTop stayed at 132 after 600 chars of typing -- meaning the `scroller.scrollTop += delta` assignments are either not executing on later keystrokes or are being reverted. Only the first correction stuck. Threshold logic looks right (`rel > viewH*0.7` should fire well before caret exits viewport), so the failure is that repeated deltas aren't being applied/preserved on the scroll parent.",
+        "selector": "span.type-caret / [data-testid='type-over-engine']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "AskAI Practice mode - React runtime error",
+        "issue": "During desktop 1920x800 practice typing session, a React 'Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate.' error overlay was thrown (visible red full-page overlay). Stack points at dispatchSetState -> processDispatchQueue -> batchedUpdates. Most likely culprit is the caret useEffect (deps [input, chars]) doing setCaret + scroller.scrollTop mutation, combined with the AssistantMessage re-renders. This is a NEW regression not present in iteration_12.",
+        "selector": "body > iframe (react-error-overlay)",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/tests/seed_thread.py", "/app/tests/cleanup_thread.py"],
+  "action_items": [
+    "Debug why `scroller.scrollTop += delta` at TypeOverEngine.jsx:122 only takes effect on the first correction. Suspicions: (a) delta is being computed against a stale rect after a first scroll while the effect is batched with setCaret re-render, (b) something (React StrictMode double-invocation? AskAI parent effect?) is resetting scrollTop. Try wrapping the scroll in a requestAnimationFrame after DOM commit, or use scroller.scrollTo({top: scroller.scrollTop + delta, behavior:'auto'}). Also consider running the scroll adjustment as a *layout* effect (useLayoutEffect) so the caret rect is fresh.",
+    "Fix the 'Maximum update depth exceeded' React error on desktop practice mode. Likely the caret useEffect triggers a setState (setCaret) that changes some parent state, which re-runs the effect. Guard setCaret against no-op writes (compare left/top/height before setState) and use useLayoutEffect so scroll mutations happen synchronously before paint.",
+    "Consider lowering the trigger threshold from 0.7 to 0.55-0.6 on mobile, since a single missed correction (as observed here) makes the caret drop 3-4 lines below viewport very quickly at leading-2 large font."
+  ],
+  "critical_code_review_comments": [
+    "TypeOverEngine.jsx:96-126 -- The caret effect mixes state updates (setCaret) with DOM side effects (scroller.scrollTop, window.scrollBy). Recommend useLayoutEffect + memoized/idempotent setCaret so React doesn't get into a loop with the surrounding parent.",
+    "The 'only-first-correction-sticks' behavior strongly suggests a stale-closure or a competing effect that resets scrollTop after our delta. Log scroller.scrollTop before/after inside the effect to confirm.",
+    "AskAI.jsx:90-92 sets scrollRef.scrollTop=scrollHeight on [messages, sending] changes; this doesn't run during practice typing, so it isn't the resetter here.",
+    "Character registration continues to work correctly (grey chars in typed range = 0/200)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "Character registration PASS 2/2; Caret-in-viewport FAIL 2/2 (desktop 3/20 off-screen, mobile 5/12 off-screen); NEW critical: React max-update-depth overlay on desktop practice."},
+  "test_credentials": "demo@masterai.com / demo1234",
+  "seed_data_creation": "Inserted 1 chat_threads doc (thread_id prefix 'test-caret-') with a 1821-char water-cycle assistant message; cleaned up with /app/tests/cleanup_thread.py (deleted=1).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Use /app/tests/seed_thread.py to seed and /app/tests/cleanup_thread.py to teardown. Login demo@masterai.com/demo1234, navigate /app/ask, open History -> the seeded 'Caret test' thread, click Practice, focus [data-testid='type-input'], keyboard.type. Sample span.type-caret rect.top every 50 chars, expect band 30-70% throughout. Iteration_13 observed only ONE successful scroll correction per session (scrollTop stuck at 132 on mobile despite ~3320px of headroom in the messages container). Also watch for the 'Maximum update depth exceeded' React error overlay on desktop -- must not appear.",
+  "rca of the issue": "The delta-scroll fix does detect the correct scroll ancestor (the AskAI messages `flex-1 overflow-y-auto` container) and the threshold check appears to trigger, but only the first `scroller.scrollTop += delta` persists. Subsequent deltas either don't fire or are reverted, so as typing continues the caret creeps below viewH*0.7 and eventually exits the viewport (desktop after ~900 chars, mobile after ~400 chars). Mobile scroller diagnostic confirms scrollTop=132 (unchanged from open) with scrollHeight=3875, clientHeight=555 -- so the container had ~3.3k px of scroll room that was never used. Combined with a new 'Maximum update depth' React error on desktop, the fix is not shippable. Recommended next fix: switch to useLayoutEffect, guard setCaret against no-op updates, and scroll via scroller.scrollTo({top: scroller.scrollTop+delta}) inside rAF to survive React's batched updates."
+}

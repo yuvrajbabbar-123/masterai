@@ -92,38 +92,50 @@ export function TypeOverEngine({ text, onComplete, onFirstKey, onProgress }) {
     return () => clearInterval(id);
   }, [input, finished]);
 
-  // caret positioning
+  // caret positioning (guard against redundant state writes)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const idx = input.length;
-    const target = charRefs.current[idx];
     const cont = container.getBoundingClientRect();
+    const target = charRefs.current[idx];
+    let next = null;
     if (target) {
       const r = target.getBoundingClientRect();
-      setCaret({ left: r.left - cont.left, top: r.top - cont.top, height: r.height });
+      next = { left: r.left - cont.left, top: r.top - cont.top, height: r.height };
     } else {
       const last = charRefs.current[idx - 1];
       if (last) {
         const r = last.getBoundingClientRect();
-        setCaret({ left: r.right - cont.left, top: r.top - cont.top, height: r.height });
+        next = { left: r.right - cont.left, top: r.top - cont.top, height: r.height };
       }
     }
-    // keep the line being typed comfortably in view (explicit delta scroll)
-    const active = target || charRefs.current[idx - 1];
-    if (active && input.length > 0) {
-      const rect = active.getBoundingClientRect();
+    if (next) {
+      setCaret((prev) =>
+        (prev.left === next.left && prev.top === next.top && prev.height === next.height) ? prev : next
+      );
+    }
+  }, [input, chars]);
+
+  // keep the line being typed in view — runs after paint, reads fresh rect, no setState
+  useEffect(() => {
+    if (input.length === 0) return;
+    const raf = requestAnimationFrame(() => {
+      const active = charRefs.current[input.length] || charRefs.current[input.length - 1];
+      if (!active) return;
       const scroller = getScrollParent(active);
+      const rect = active.getBoundingClientRect();
       const viewTop = scroller ? scroller.getBoundingClientRect().top : 0;
       const viewH = scroller ? scroller.clientHeight : window.innerHeight;
-      const rel = rect.top - viewTop;           // caret position within its viewport
-      if (rel < viewH * 0.3 || rel > viewH * 0.7) {
-        const delta = rel - viewH * 0.45;       // recenter toward 45%
+      const rel = rect.top - viewTop;
+      if (rel < viewH * 0.3 || rel > viewH * 0.6) {
+        const delta = rel - viewH * 0.4;
         if (scroller) scroller.scrollTop += delta;
         else window.scrollBy({ top: delta });
       }
-    }
-  }, [input, chars]);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [input]);
 
   // group into words for natural wrapping
   const words = useMemo(() => {
