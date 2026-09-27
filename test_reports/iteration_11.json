@@ -1,0 +1,40 @@
+{
+  "summary": "Verified the scroll fix for AskAI Practice → TypeOverEngine flow at both desktop (1920x800) and mobile (390x844). Primary bug (page jumps to bottom of answer on Practice click) is FIXED on both viewports — TypeOverEngine top is inside the viewport (desktop top=95/800, mobile top=92/844). Typing via focus + keyboard.type works, characters register, visual caret span.type-caret is present. However, the secondary 'follow caret while typing' behavior only works partially: caret goes OFF-SCREEN below viewport once user types deeper into a long (1098-char) answer — desktop caret at y=815/800 after ~900 chars, mobile caret at y=1197/844 after ~500 chars.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "TypeOverEngine (caret follow-scroll)",
+        "issue": "Once the currently-typed character crosses below the viewport bottom on a tall answer, the page/scroll container does NOT scroll to follow the caret. On mobile 390x844 this happens by ~500 chars (caret at y=1197). On desktop 1920x800 by ~900 chars (caret at y=815). The active.scrollIntoView({block:'nearest', inline:'nearest'}) in the caret useEffect (line ~104) appears insufficient — likely because 'nearest' does not always scroll a document/window ancestor when the char span is only slightly out of view, or an ancestor has overflow:hidden preventing the intended outer scroll. Consider block:'center' when the caret is close to viewport bottom, or explicitly scrolling containerRef's scrollable ancestor.",
+        "selector": "span.type-caret / [data-testid='type-over-engine']",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "TypeOverEngine tap-to-type overlay",
+        "issue": "data-testid='tap-to-type' overlay never appears in the Practice flow because the mount useEffect (line ~38-42) calls hiddenInputRef.current.focus({preventScroll:true}) after 60ms, which sets focused=true and hides the overlay before the user sees it. Only reappears if user blurs. The review request expects it to 'still appear correctly before typing begins' — either drop that expectation or gate the autofocus to desktop-with-keyboard only so the mobile tap-to-type still shows.",
+        "selector": "[data-testid='tap-to-type']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix caret-follow scroll in TypeOverEngine caret useEffect (line ~86-105) so the outer scroll container follows the typing position through the whole answer, not only when the char is 'nearest'-visible. Suggest scrolling the closest overflow-y:auto ancestor by delta, or using block:'center' when caret rect bottom exceeds window.innerHeight - buffer.",
+    "Decide intended behavior for data-testid='tap-to-type': if it must show before first key, remove auto-focus on mount or defer it until first user interaction/pointerdown."
+  ],
+  "critical_code_review_comments": [
+    "TypeOverEngine.jsx line 104: active.scrollIntoView({block:'nearest'}) does nothing when the element is only marginally offscreen or when the nearest scroll ancestor is not the window. Recommend computing rect vs window.innerHeight and scrolling by the delta on window or the explicit chat scroll container.",
+    "Autofocus with preventScroll:true (line 39) correctly avoids the browser scroll-jump on Practice open — good fix.",
+    "Hidden input reduced to 1px top-left (line 154) correctly prevents native caret-in-view auto-scroll — good fix."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only test)", "frontend": "Primary scroll-jump fix: PASS (2/2 viewports). Follow-caret: FAIL (2/2 viewports)."},
+  "test_credentials": "demo@masterai.com / demo1234 (from review request)",
+  "seed_data_creation": "Inserted a chat_threads doc (thread_id prefix 'test-scroll-') under demo user with a 1098-char water-cycle assistant reply because Gemini provider returned 429 (quota exhausted at provider level, not internal usage counter — resetting DB usage.ask=0 did not help). Cleaned up after testing.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Gemini provider is 429-throttled — do NOT try to trigger a real AI answer. Instead, seed a chat_threads document under demo user with a long assistant message and open it via History dropdown to reach the Practice button. To type into the hidden input use page.focus('[data-testid=\"type-input\"]') then page.keyboard.type; page.fill will not fire the typing engine correctly. Primary bug (Practice click scroll-jump to bottom) is confirmed fixed. Remaining issue is the follow-caret scroll drifting off-screen — that's what the next iteration should verify after E1 tweaks the caret useEffect.",
+  "rca of the issue": "Follow-caret failure: active.scrollIntoView({block:'nearest', inline:'nearest'}) with 'nearest' does not scroll the window when the element is only slightly out of view or when an ancestor is not itself scrollable, so as the user types further into a long answer the current char slips below the viewport bottom without the page scrolling. The primary scroll-jump-on-open bug was correctly fixed by (a) shrinking the hidden input to 1px so the browser stops auto-scrolling to a large input's native caret, (b) focus({preventScroll:true}), and (c) containerRef.scrollIntoView({block:'start'}) on Practice open."
+}

@@ -101,7 +101,14 @@ export function TypeOverEngine({ text, onComplete, onFirstKey, onProgress }) {
     }
     // keep the line being typed comfortably in view
     const active = target || charRefs.current[idx - 1];
-    if (active && input.length > 0) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+    if (active && input.length > 0) {
+      const rect = active.getBoundingClientRect();
+      const topLimit = 120;
+      const bottomLimit = window.innerHeight - 160;
+      if (rect.bottom > bottomLimit || rect.top < topLimit) {
+        active.scrollIntoView({ block: "center", inline: "nearest" });
+      }
+    }
   }, [input, chars]);
 
   // group into words for natural wrapping
