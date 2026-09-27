@@ -1,0 +1,35 @@
+{
+  "summary": "Retested the caret-follow-scroll behavior in TypeOverEngine on Ask AI Practice mode with a seeded 1479-char assistant message. Typed ~1000 chars on desktop 1920x800 and ~600 chars on mobile 390x844 via page.focus + page.keyboard.type. Character registration works (colours flipped from grey to white/red — 0 grey remained in the first 200 chars). However the primary review-request expectation FAILS on both viewports: the type-caret drifts BELOW the viewport bottom as the user types further and the page does not scroll to follow it. Desktop: caret goes off-screen at ~926 chars (top=850.8, winH=800) and reaches top=886.8 by 1000 chars — 4 off-screen samples out of 14. Mobile is worse: caret first goes off-screen at ~414 chars (top=981.8, winH=844) and reaches top=1377.8 by 600 chars — 6 off-screen samples out of 10.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "TypeOverEngine caret follow-scroll",
+        "issue": "The updated caret useEffect (line 86-111) with topLimit=120, bottomLimit=window.innerHeight-160, and active.scrollIntoView({block:'center', inline:'nearest'}) still does NOT keep the caret in view for long answers. On desktop 1920x800 the caret bottom exceeds 640 (winH-160) by ~900 chars typed and the scroll does not follow; caret ends at top=886.8/winH=800. On mobile 390x844 the caret goes off-screen at ~414 chars typed and reaches top=1377.8/winH=844 by 600 chars. Root cause is most likely that scrollIntoView on the char span cannot scroll the correct outer container — the Ask AI page has a fixed footer (message input) and a fixed header, and the actual scrollable ancestor is neither window nor the direct parent of the char span (it's some middle overflow-y:auto wrapper). scrollIntoView({block:'center'}) picks the nearest scrollable ancestor which may already be scrolled to its max, so nothing further happens.",
+        "selector": "span.type-caret / [data-testid='type-over-engine']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Replace active.scrollIntoView({block:'center'}) in TypeOverEngine.jsx line ~109 with an explicit window.scrollBy / container-scroll based on delta: e.g. if (rect.bottom > bottomLimit) window.scrollBy({ top: rect.bottom - bottomLimit + 80, behavior:'auto' }); and also walk up parent chain to find the real overflow-y:auto scrollable ancestor and scroll it by the same delta. On the Ask AI screen the scroll container is a middle wrapper — scrolling only the window is not enough.",
+    "Verify on mobile 390x844: given a fixed bottom input and header, ensure the practice content wrapper has enough bottom padding (~200px) so the caret can actually be centered in the viewport when the user is deep into the answer.",
+    "Consider clamping the visible caret line to about 40-50% of viewport height by scrolling in smaller increments each keystroke rather than only when bottomLimit is exceeded."
+  ],
+  "critical_code_review_comments": [
+    "TypeOverEngine.jsx line 109: active.scrollIntoView({block:'center'}) relies on the browser picking the correct scroll ancestor. When the char span's nearest overflow:auto ancestor is at its scrollTop max and the actual scrolling should happen on window, scrollIntoView will silently no-op. Prefer manual delta-based scroll on both window and any overflow-y:auto ancestor.",
+    "The bottom threshold of window.innerHeight - 160 is too generous on mobile 390x844 (=684). At target font size (leading 2.2) each line is ~50px, so the caret can be 3+ lines below threshold before triggering. Since the trigger fires but does nothing, this is masked; but even if fixed, a tighter threshold (e.g. innerHeight * 0.6) would give a better UX.",
+    "Character registration works correctly (colours flip grey → white/red)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "Character registration: PASS (2/2 viewports). Caret-stays-in-viewport: FAIL (2/2 viewports)."},
+  "test_credentials": "demo@masterai.com / demo1234",
+  "seed_data_creation": "Inserted a chat_threads doc (thread_id prefix 'test-caret-') under demo user with a 1479-char water-cycle assistant reply because Gemini provider is 429-throttled. Cleaned up after testing (delete_many test-caret-*).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Seed a chat_threads doc with a long assistant message (see iteration_11 pattern) and open via History → thread. Practice open scroll is confirmed fixed. The remaining issue is that scrollIntoView({block:'center'}) at TypeOverEngine.jsx:109 fires but does not actually scroll — because the real scrollable ancestor on the Ask AI page is not what scrollIntoView picks. E1 should switch to explicit window.scrollBy + walking parents to find overflow-y:auto ancestor and scrolling by delta. Retest at 390x844 (target 600 chars) and 1920x800 (target 1000 chars); expect caret rect.top to remain between 0 and window.innerHeight throughout.",
+  "rca of the issue": "The caret useEffect correctly detects when the active char is outside topLimit/bottomLimit, but scrollIntoView({block:'center', inline:'nearest'}) picks the char's nearest scrollable ancestor and calls block-center on THAT. On the Ask AI screen the type-over-engine sits inside a chat message container that itself may be inside a middle overflow-y:auto wrapper; when that wrapper is already fully scrolled to its bottom, scrollIntoView finds no room to scroll further and stops — even though window/body still has headroom (or vice versa). Result: caret exits the viewport as user types deeper. Fix requires explicit delta scrolling on both the identified scroll ancestor and the window."
+}

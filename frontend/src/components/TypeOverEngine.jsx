@@ -1,5 +1,15 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
+function getScrollParent(el) {
+  let node = el?.parentElement;
+  while (node) {
+    const oy = getComputedStyle(node).overflowY;
+    if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
 /**
  * The shared monkeytype-style Type-Over engine.
  * Displays source text greyed out, user types on top, live char-by-char diff.
@@ -99,14 +109,18 @@ export function TypeOverEngine({ text, onComplete, onFirstKey, onProgress }) {
         setCaret({ left: r.right - cont.left, top: r.top - cont.top, height: r.height });
       }
     }
-    // keep the line being typed comfortably in view
+    // keep the line being typed comfortably in view (explicit delta scroll)
     const active = target || charRefs.current[idx - 1];
     if (active && input.length > 0) {
       const rect = active.getBoundingClientRect();
-      const topLimit = 120;
-      const bottomLimit = window.innerHeight - 160;
-      if (rect.bottom > bottomLimit || rect.top < topLimit) {
-        active.scrollIntoView({ block: "center", inline: "nearest" });
+      const scroller = getScrollParent(active);
+      const viewTop = scroller ? scroller.getBoundingClientRect().top : 0;
+      const viewH = scroller ? scroller.clientHeight : window.innerHeight;
+      const rel = rect.top - viewTop;           // caret position within its viewport
+      if (rel < viewH * 0.3 || rel > viewH * 0.7) {
+        const delta = rel - viewH * 0.45;       // recenter toward 45%
+        if (scroller) scroller.scrollTop += delta;
+        else window.scrollBy({ top: delta });
       }
     }
   }, [input, chars]);
