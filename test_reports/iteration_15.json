@@ -1,0 +1,27 @@
+{
+  "summary": "Full backend+frontend test of the new Ask AI attachment flow (iteration 15). Backend pytest (/app/backend/tests/test_chat_attachment.py) covers multipart /api/chat: text-only, .txt document attachment, empty rejection, threads listing — ALL PASS (4/4). Verified image attachment via a scripted multimodal call (sign.png with 'HELLO WORLD 2026') — Gemini reads it in a single call. Frontend Playwright flow logged in demo@masterai.com/demo1234, landed on /app/ask, confirmed '+' button + hidden file input (image/*,.pdf,.doc,.docx,.txt), text-only chat renders Markdown (strong/ul/li tags present, no raw ** leak), document attach shows chip with filename + remove button, user bubble shows '📎 story.txt', AI answer references the file content (fox/dog/oak/butterfly), image attach prompts a single multimodal reply that quotes 'HELLO WORLD 2026', remove-attachment clears the chip, Practice CTA opens TypeOverEngine with plain text (0 markdown markers detected: no **, ```, # , -  , *  leaks), typing registers, Close returns to the formatted answer. History dropdown lists 12 threads, New chat clears the pending attachment and empties the thread.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_chat_attachment.py",
+    "/app/test_reports/pytest/chat_attach.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py /chat correctly uses multipart Form+File and stores a clean display message (filename only, with 📎) in history rather than the giant document dump — good for history size and privacy.",
+    "ai_service.chat_reply inserts inline_data image part into the latest user turn — single multimodal Gemini call verified end-to-end. No extra OCR hop. Good.",
+    "toPlainText in AskAI.jsx strips bold/italic/headings/lists/code fences/links; the practice source now shows no residual **, ```, #, bullet or numbered markers. Confirmed on an answer that originally had bold headers and numbered steps.",
+    "Minor nit (not blocking): backend accepts an empty file field but still responds 400 only when BOTH message and image are empty; a lone unreadable doc (<20 chars) correctly returns 400 'Not enough readable text'. Behavior is consistent.",
+    "Minor nit: when file is present with no message, backend auto-fills prompt to 'Please look at this image / help me with it.' — only for images. For documents it falls back to the attached-file context message. Good coverage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_chat_attachment.py (new)"
+  ],
+  "success_rate": { "backend": "100% (4/4 pytest + 1 ad-hoc image multimodal)", "frontend": "100% (login, add-button, text-md render, doc attach+send+content-ref, image attach+send+content-ref, chip remove, Practice-plain, Practice-close, History, New-chat-clears)" },
+  "test_credentials": "demo@masterai.com / demo1234",
+  "seed_data_creation": "Created /tmp/upl/story.txt and reused /tmp/sign.png (400x120 PNG saying 'HELLO WORLD 2026' generated via PIL) during the Playwright run. Test chat threads for demo user grew by ~3 during this iteration.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend /api/chat is now multipart/form-data (fields: thread_id, message, file). Pytest regression at /app/backend/tests/test_chat_attachment.py covers text/doc/empty/list. Frontend selectors used: add-attachment-button, file-input, attachment-chip, remove-attachment-button, chat-input, send-button, answer-text, answer-practice, practice-answer-button, type-input, stop-practice-button, history-button, thread-{id}, new-chat-button, chat-message-user/assistant, chat-empty. toPlainText in /app/frontend/src/pages/AskAI.jsx handles markdown stripping for Practice.",
+  "rca of the issue": "No bugs found in this iteration."
+}
