@@ -22,9 +22,26 @@ root.render(
   </React.StrictMode>,
 );
 
-// Register service worker for offline support & caching
+// Register service worker for offline support & caching.
+// Auto-reload once when a new version takes over so users never get stranded on a stale build.
 if ("serviceWorker" in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").then((reg) => {
+      reg.addEventListener("updatefound", () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener("statechange", () => {
+          if (nw.state === "installed" && navigator.serviceWorker.controller) {
+            nw.postMessage?.({ type: "SKIP_WAITING" });
+          }
+        });
+      });
+    }).catch(() => {});
   });
 }

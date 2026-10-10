@@ -1,5 +1,5 @@
 /* MasterAI service worker — offline support & caching */
-const CACHE = "masterai-v1";
+const CACHE = "masterai-v2";
 const APP_SHELL = ["/", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
@@ -7,6 +7,10 @@ self.addEventListener("install", (event) => {
     caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL).catch(() => {}))
   );
   self.skipWaiting();
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -49,7 +53,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets: stale-while-revalidate
+  // App code (JS/CSS) must always be fresh → network-first, cache as offline fallback
+  const isCode =
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.includes("bundle");
+  if (isCode) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Other static assets (images, fonts, icons): stale-while-revalidate
   event.respondWith(
     caches.match(req).then((cached) => {
       const network = fetch(req)
