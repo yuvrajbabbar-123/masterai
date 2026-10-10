@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File, Form
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -299,33 +299,81 @@ async def ai_ask(body: AskRequest, current=Depends(get_current_user)):
 
 # ================= CHAT (ChatGPT-style tool) =================
 @api_router.post("/chat")
-async def chat(body: ChatRequest, current=Depends(get_current_user)):
-    msg = (body.message or "").strip()
-    if not msg:
+async def chat(
+    thread_id: str = Form(None),
+    message: str = Form(""),
+    file: UploadFile = File(None),
+    current=Depends(get_current_user),
+):
+    msg = (message or "").strip()
+    image_b64 = image_mime = None
+    attachment_name = None
+
+    if file is not None:
+        content = await file.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large. Max 10 MB.")
+        name = (file.filename or "").lower()
+        ctype = file.content_type or ""
+        attachment_name = file.filename
+        is_image = ctype.startswith("image/") or name.endswith((".png", ".jpg", ".jpeg", ".webp", ".heic"))
+        if is_image:
+            import base64
+            image_b64 = base64.b64encode(content).decode()
+            image_mime = ctype or "image/png"
+        else:
+            try:
+                doc_text = document_service.extract_text(file.filename, content)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except Exception:
+                raise HTTPException(status_code=400, detail="Could not read this file. Try a PDF, Word or text file, or an image.")
+            doc_text = (doc_text or "").strip()
+            if len(doc_text) < 20:
+                raise HTTPException(status_code=400, detail="Not enough readable text found in this file.")
+            # attach the file's text as context to this turn (no extra AI call)
+            context = f'[Attached file "{file.filename}"]:\n"""\n{doc_text[:20000]}\n"""\n\n'
+            msg = context + (msg or "Please read the attached file and help me with it.")
+
+    if not msg and not image_b64:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
+    if not msg and image_b64:
+        msg = "Please look at this image and help me with it."
+
     await check_limit(current, "ask")
 
     uid = current["user_id"]
     thread = None
-    if body.thread_id:
-        thread = await db.chat_threads.find_one({"thread_id": body.thread_id, "user_id": uid}, {"_id": 0})
+    if thread_id:
+        thread = await db.chat_threads.find_one({"thread_id": thread_id, "user_id": uid}, {"_id": 0})
     if not thread:
+        title = (attachment_name or msg)[:60] or "New chat"
         thread = {
             "thread_id": new_id("thread"), "user_id": uid,
-            "title": msg[:60], "messages": [],
+            "title": title, "messages": [],
             "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
         }
 
+    # what we show/store as the user's turn (keep it clean, not the giant file dump)
+    display_msg = (message or "").strip()
+    if attachment_name and not display_msg:
+        display_msg = f"Sent: {attachment_name}"
+    elif attachment_name:
+        display_msg = f"{display_msg}\n\n📎 {attachment_name}"
+
     history = thread["messages"] + [{"role": "user", "content": msg}]
     try:
-        reply = await ai_service.chat_reply(history[-20:])
+        reply = await ai_service.chat_reply(history[-20:], image_b64=image_b64, image_mime=image_mime)
     except Exception as e:
         raise _ai_http_error(e)
     await consume(current, "ask")
 
     now = now_utc().isoformat()
-    thread["messages"] = history + [{"role": "assistant", "content": reply, "at": now}]
-    thread["messages"][-2]["at"] = now
+    # store the clean display message (not the file context) for history
+    thread["messages"] = thread["messages"] + [
+        {"role": "user", "content": display_msg, "at": now},
+        {"role": "assistant", "content": reply, "at": now},
+    ]
     thread["updated_at"] = now
     await db.chat_threads.update_one(
         {"thread_id": thread["thread_id"], "user_id": uid},

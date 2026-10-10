@@ -93,36 +93,26 @@ async def _ask_json(system: str, prompt: str, session_id: str = None):
 
 
 CHAT_SYSTEM = (
-    "You are MasterAI, a friendly AI assistant. "
-    "Always write in simple, plain, everyday English that anyone can understand, "
-    "and use normal prose with normal punctuation only. "
-    "Do NOT use markdown, headings, bullet symbols, numbered-list markup or code fences. "
-    "Match the LENGTH of your answer to what the user is asking for: "
-    "give a short answer (a few sentences) for a simple or quick question, "
-    "but give a full, complete and detailed answer when the user asks for a summary, "
-    "an explanation, a step-by-step, a list, a page-wise or chapter-wise breakdown, "
-    "or anything that clearly needs depth. Never cut a detailed request short. "
-    "When a breakdown is requested, write each part as its own clearly separated paragraph in plain text."
+    "You are MasterAI, a helpful AI assistant. Answer naturally and conversationally, "
+    "just like a normal AI assistant. Use Markdown formatting when it helps."
 )
 
 
-async def chat_reply(messages: list) -> str:
+async def chat_reply(messages: list, image_b64: str = None, image_mime: str = None) -> str:
     contents = []
     for m in messages:
         role = "model" if m.get("role") == "assistant" else "user"
         contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+    # attach an image to the latest user turn (single multimodal call)
+    if image_b64 and contents and contents[-1]["role"] == "user":
+        contents[-1]["parts"].insert(0, {"inline_data": {"mime_type": image_mime or "image/png", "data": image_b64}})
     payload = {
         "system_instruction": {"parts": [{"text": CHAT_SYSTEM}]},
         "contents": contents,
         "generationConfig": {"temperature": 0.7},
     }
     data = await _post_gemini(payload)
-    text = _text_from(data)
-    # keep answers plain & typeable (strip stray markdown, preserve line breaks)
-    text = text.replace("*", "").replace("#", "").replace("`", "")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text).strip()
-    return text
+    return _text_from(data)
 
 
 async def _generate_multimodal(system: str, prompt: str, image_b64: str, mime: str) -> str:

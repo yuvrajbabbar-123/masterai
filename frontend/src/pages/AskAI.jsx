@@ -1,15 +1,34 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { TypeOverEngine } from "@/components/TypeOverEngine";
 import {
   PaperPlaneRight, Plus, ClockCounterClockwise, Copy, Check,
-  Trash, Sparkle, Robot, Keyboard, X,
+  Trash, Sparkle, Robot, Keyboard, X, Paperclip, Image as ImageIcon, FileText,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+// convert markdown answer to plain, typeable text for Practice mode
+function toPlainText(md) {
+  return (md || "")
+    .replace(/```[\s\S]*?```/g, (b) => b.replace(/```[a-z]*\n?/gi, "").replace(/```/g, ""))
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 const SUGGESTIONS = [
   "Explain quantum entanglement simply",
@@ -38,19 +57,19 @@ function CopyButton({ text }) {
 
 function AssistantMessage({ content }) {
   const [practicing, setPracticing] = useState(false);
+  const plain = toPlainText(content);
 
   return (
     <div className="group max-w-[85%]" data-testid="assistant-answer">
-      <div className="rounded-2xl px-4 py-3 bg-[#171717] border border-white/10">
+      <div className="rounded-2xl px-4 py-3 bg-[#171717] border border-white/10 text-[#E5E5E5]">
         {practicing ? (
           <div data-testid="answer-practice">
-            <TypeOverEngine text={content} />
+            <TypeOverEngine text={plain} />
           </div>
         ) : (
-          // greyed-out answer
-          <p className="text-sm leading-relaxed whitespace-pre-wrap text-[#737373]" data-testid="answer-text">
-            {content}
-          </p>
+          <div className="chat-md text-sm leading-relaxed" data-testid="answer-text">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          </div>
         )}
       </div>
       <div className="mt-1.5 flex items-center gap-3">
@@ -79,8 +98,10 @@ export default function AskAI() {
   const [threads, setThreads] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [file, setFile] = useState(null);
   const scrollRef = useRef(null);
   const taRef = useRef(null);
+  const fileRef = useRef(null);
 
   const loadThreads = useCallback(async () => {
     try { const res = await api.get("/chat/threads"); setThreads(res.data); } catch {}
@@ -91,7 +112,7 @@ export default function AskAI() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, sending]);
 
-  const newChat = () => { setThreadId(null); setMessages([]); setInput(""); taRef.current?.focus(); };
+  const newChat = () => { setThreadId(null); setMessages([]); setInput(""); setFile(null); taRef.current?.focus(); };
 
   const openThread = async (id) => {
     try {
@@ -111,14 +132,30 @@ export default function AskAI() {
     } catch { toast.error("Delete failed"); }
   };
 
+  const pickFile = (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) { toast.error("File too large. Max 10 MB."); return; }
+    setFile(f);
+    taRef.current?.focus();
+  };
+
   const send = async (text) => {
     const msg = (text ?? input).trim();
-    if (!msg || sending) return;
+    if ((!msg && !file) || sending) return;
+    const attached = file;
+    const userContent = attached ? `${msg ? msg + "\n\n" : ""}📎 ${attached.name}` : msg;
     setInput("");
-    setMessages((m) => [...m, { role: "user", content: msg }]);
+    setFile(null);
+    setMessages((m) => [...m, { role: "user", content: userContent }]);
     setSending(true);
     try {
-      const res = await api.post("/chat", { thread_id: threadId, message: msg });
+      const form = new FormData();
+      if (threadId) form.append("thread_id", threadId);
+      form.append("message", msg);
+      if (attached) form.append("file", attached);
+      const res = await api.post("/chat", form, { headers: { "Content-Type": "multipart/form-data" } });
       setThreadId(res.data.thread_id);
       setMessages((m) => [...m, { role: "assistant", content: res.data.reply }]);
       loadThreads();
@@ -228,7 +265,32 @@ export default function AskAI() {
 
       {/* Composer */}
       <div className="mt-4 shrink-0">
-        <div className="flex items-end gap-3 rounded-2xl border border-white/10 bg-[#171717] p-2 pl-4 focus-within:border-[#EAB308]/50 transition-colors">
+        {file && (
+          <div className="mb-2 flex items-center gap-2 w-fit max-w-full rounded-xl border border-white/10 bg-[#171717] pl-3 pr-2 py-2" data-testid="attachment-chip">
+            {file.type.startsWith("image/")
+              ? <ImageIcon size={16} className="text-[#EAB308] shrink-0" />
+              : <FileText size={16} className="text-[#EAB308] shrink-0" />}
+            <span className="text-xs text-[#E5E5E5] truncate max-w-[200px]">{file.name}</span>
+            <button onClick={() => setFile(null)} data-testid="remove-attachment-button"
+              className="text-[#525252] hover:text-[#F43F5E] shrink-0 p-0.5">
+              <X size={14} weight="bold" />
+            </button>
+          </div>
+        )}
+        <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-[#171717] p-2 pl-2 focus-within:border-[#EAB308]/50 transition-colors">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            onChange={pickFile}
+            className="hidden"
+            data-testid="file-input"
+          />
+          <button onClick={() => fileRef.current?.click()} disabled={sending} data-testid="add-attachment-button"
+            title="Add a photo or document"
+            className="w-10 h-10 rounded-xl border border-white/10 text-[#A3A3A3] flex items-center justify-center hover:text-white hover:border-white/30 transition-colors disabled:opacity-40 shrink-0">
+            <Plus size={20} weight="bold" />
+          </button>
           <textarea
             ref={taRef}
             data-testid="chat-input"
@@ -239,7 +301,7 @@ export default function AskAI() {
             placeholder="Message MasterAI…  (Enter to send, Shift+Enter for a new line)"
             className="flex-1 bg-transparent resize-none outline-none text-sm py-2 max-h-40 text-[#E5E5E5] placeholder:text-[#525252]"
           />
-          <button onClick={() => send()} disabled={sending || !input.trim()} data-testid="send-button"
+          <button onClick={() => send()} disabled={sending || (!input.trim() && !file)} data-testid="send-button"
             className="w-10 h-10 rounded-xl bg-[#EAB308] text-[#0A0A0A] flex items-center justify-center hover:bg-[#FACC15] transition-colors disabled:opacity-40 shrink-0">
             <PaperPlaneRight size={18} weight="fill" />
           </button>
